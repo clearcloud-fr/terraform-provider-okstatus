@@ -16,6 +16,12 @@ permissions:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    # `secrets` can't be referenced directly in a step's `if:` (GitHub's
+    # expression parser rejects it: "Unrecognized named-value: 'secrets'").
+    # Hoist it into a job-level env var instead, which steps can read via
+    # the `env` context — the standard workaround for this.
+    env:
+      HAS_GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,18 +34,27 @@ jobs:
       - name: Import GPG key
         # Skip signing entirely if no GPG_PRIVATE_KEY secret is configured —
         # useful for a private registry that doesn't require signed
-        # checksums. Delete this `if:` (and the `--skip=sign` below) once a
-        # signing key is set up, to match HashiCorp's standard workflow.
-        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        # checksums. Once a signing key is set up as a repo secret, this
+        # step (and the "unsigned" GoReleaser step below) activate
+        # automatically — nothing else to change here.
+        if: ${{ env.HAS_GPG_KEY == 'true' }}
         uses: crazy-max/ghaction-import-gpg@v6
         id: import_gpg
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
-      - name: Run GoReleaser
+      - name: Run GoReleaser (signed)
+        if: ${{ env.HAS_GPG_KEY == 'true' }}
         uses: goreleaser/goreleaser-action@v6
         with:
-          args: release --clean ${{ secrets.GPG_PRIVATE_KEY == '' && '--skip=sign' || '' }}
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+      - name: Run GoReleaser (unsigned)
+        if: ${{ env.HAS_GPG_KEY != 'true' }}
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          args: release --clean --skip=sign
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
