@@ -170,6 +170,32 @@ func (c *Client) DeleteMonitor(ctx context.Context, id string) error {
 	return c.do(ctx, http.MethodDelete, "/monitors/"+id, nil, nil)
 }
 
+type monitorListEnvelope struct {
+	Monitors []Monitor `json:"monitors"`
+	Pages    int64     `json:"pages"`
+}
+
+// ListMonitors returns every monitor in the org, paging through GET
+// /monitors internally — a single page caps at 50 (PageQuerySchema in
+// api-v1.ts), and a caller asking "what already exists" wants the full set,
+// not a silently truncated first page.
+func (c *Client) ListMonitors(ctx context.Context) ([]Monitor, error) {
+	const perPage = 100
+	var all []Monitor
+	for page := int64(1); ; page++ {
+		var env monitorListEnvelope
+		path := fmt.Sprintf("/monitors?page=%d&per_page=%d", page, perPage)
+		if err := c.do(ctx, http.MethodGet, path, nil, &env); err != nil {
+			return nil, err
+		}
+		all = append(all, env.Monitors...)
+		if len(env.Monitors) == 0 || page >= env.Pages {
+			break
+		}
+	}
+	return all, nil
+}
+
 // ─── Incidents ──────────────────────────────────────────────────
 
 type Incident struct {
@@ -330,17 +356,27 @@ func (c *Client) CreateAlertChannel(ctx context.Context, in AlertChannelCreateIn
 	return &out, nil
 }
 
-// GetAlertChannel — api-v1 has no GET /alert-channels/:id, only the list;
-// filter it client-side (mirrors what a hand-written Terraform Read for a
-// list-only backend resource has to do).
-func (c *Client) GetAlertChannel(ctx context.Context, id string) (*AlertChannel, error) {
+// ListAlertChannels returns every alert channel in the org — api-v1 has no
+// pagination on this endpoint, it's always the full set in one response.
+func (c *Client) ListAlertChannels(ctx context.Context) ([]AlertChannel, error) {
 	var env struct {
 		Channels []AlertChannel `json:"channels"`
 	}
 	if err := c.do(ctx, http.MethodGet, "/alert-channels", nil, &env); err != nil {
 		return nil, err
 	}
-	for _, ch := range env.Channels {
+	return env.Channels, nil
+}
+
+// GetAlertChannel — api-v1 has no GET /alert-channels/:id, only the list;
+// filter it client-side (mirrors what a hand-written Terraform Read for a
+// list-only backend resource has to do).
+func (c *Client) GetAlertChannel(ctx context.Context, id string) (*AlertChannel, error) {
+	channels, err := c.ListAlertChannels(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, ch := range channels {
 		if ch.ID == id {
 			return &ch, nil
 		}

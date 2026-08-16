@@ -42,11 +42,11 @@ resource "okstatus_status_page" "public" {
 }
 
 resource "okstatus_maintenance" "db_upgrade" {
-  title            = "Database upgrade"
-  message          = "Scheduled PostgreSQL major version upgrade."
-  scheduled_start  = "2026-09-01T02:00:00Z"
-  scheduled_end    = "2026-09-01T04:00:00Z"
-  monitor_ids      = [okstatus_monitor.api.id]
+  title           = "Database upgrade"
+  message         = "Scheduled PostgreSQL major version upgrade."
+  scheduled_start = "2026-09-01T02:00:00Z"
+  scheduled_end   = "2026-09-01T04:00:00Z"
+  monitor_ids     = [okstatus_monitor.api.id]
 }
 
 resource "okstatus_incident" "example" {
@@ -61,4 +61,16 @@ data "okstatus_org" "current" {}
 
 output "org_plan" {
   value = data.okstatus_org.current.plan
+}
+
+data "okstatus_monitors" "all" {}
+
+output "monitor_count" {
+  value = data.okstatus_monitors.all.total
+}
+
+data "okstatus_alert_channels" "all" {}
+
+output "alert_channel_count" {
+  value = data.okstatus_alert_channels.all.total
 }

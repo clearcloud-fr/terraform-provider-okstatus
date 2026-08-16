@@ -12,6 +12,9 @@ pages, alert channels and maintenance windows as code, against OKStatus's public
 
 ## Status
 
+Published to the Terraform Registry as
+[`clearcloud-fr/okstatus`](https://registry.terraform.io/providers/clearcloud-fr/okstatus/latest).
+
 Hand-written against `terraform-plugin-framework`, built directly from OKStatus's own
 `api-v1` OpenAPI spec (`https://api.okstatus.eu/api/v1/openapi.json`) rather than generated —
 the schemas mirror `ok-status/apps/api/src/routes/api-v1.ts` field-for-field.
@@ -37,6 +40,8 @@ this against production infrastructure.
 | Data source | Maps to |
 |---|---|
 | `okstatus_org` | `/org` (read-only) |
+| `okstatus_monitors` | `/monitors` — every monitor in the org, plus `total`; pages through the API internally |
+| `okstatus_alert_channels` | `/alert-channels` — every alert channel in the org, plus `total` |
 
 ## Provider configuration
 
@@ -49,6 +54,26 @@ provider "okstatus" {
 
 See `examples/main.tf` for a complete, `terraform validate`-checked example covering every
 resource and the data source.
+
+## Documentation
+
+`docs/` is generated with [`tfplugindocs`](https://github.com/hashicorp/terraform-plugin-docs)
+straight from each resource's Go schema (`MarkdownDescription` fields) plus the per-resource
+example `.tf` files under `examples/resources/<name>/resource.tf`,
+`examples/data-sources/<name>/data-source.tf` and `examples/provider/provider.tf` — that
+per-resource layout is what tfplugindocs actually reads; `examples/main.tf` is a separate,
+hand-maintained full example and isn't consumed by the generator. The registry pulls `docs/`
+automatically from the repo on each published tag, so this needs to stay in sync by hand:
+regenerate after any schema or example change, before tagging a release.
+
+```bash
+go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@latest generate
+```
+
+Requires Go ≥ 1.25 (same as building the provider — `GOTOOLCHAIN=auto`, the default, fetches
+it if your local `go` is older enough to still understand the 3-component `go` directive
+itself; a `go` older than 1.21 can't bootstrap that automatically and needs a manual newer
+toolchain on `PATH` first).
 
 ## `okstatus_incident` is not a normal CRUD resource
 
@@ -95,8 +120,6 @@ terraform plan   # no `terraform init` needed/possible with dev_overrides active
 - Alert channel `type`-specific config validation (the provider accepts any string map for
   `config`; `ok-status-backend` validates the actual per-type shape and will reject a bad one
   at apply time with a clear error).
-- Terraform Registry publication (GPG signing, GoReleaser, `terraform-registry-manifest.json`)
-  — not worth doing before this has seen real usage.
 - Acceptance tests (`terraform-plugin-testing`) against a real `ok-status-backend` — the
   resources above were verified against a mock server standing in for the real API; real
   acceptance tests need real credentials and a deployed backend to run against.
