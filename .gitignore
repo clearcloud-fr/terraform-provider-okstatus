@@ -1,0 +1,8 @@
+/terraform-provider-okstatus
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+/dist/
