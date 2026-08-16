@@ -4,12 +4,11 @@ A Terraform provider for [OKStatus](https://okstatus.eu) — manage monitors, in
 pages, alert channels and maintenance windows as code, against OKStatus's public API
 (`api-v1`, Max plan required for an API key).
 
-> **Naming note**: this repo currently lives at `okstatus-terrafirm-provider`, but the compiled
-> **binary** is always `terraform-provider-okstatus` — that's what Terraform's provider
-> resolution actually keys off (`terraform-provider-<NAME>`), locally or on a registry. If this
-> is ever published to the Terraform Registry, the GitHub repo itself will need renaming to
-> `terraform-provider-okstatus` to match that convention — the Go module path
-> (`github.com/clearcloud/terraform-provider-okstatus`) is already set up for that.
+> **Naming note**: the repo/binary is `terraform-provider-okstatus`, matching Terraform's
+> provider resolution convention (`terraform-provider-<NAME>`). The **registry namespace**
+> is `clearcloud-fr` (`source = "clearcloud-fr/okstatus"`), and the **Go module path**
+> (`github.com/Clearcloud-Fr/terraform-provider-okstatus`) matches the GitHub org this repo
+> actually lives under.
 
 ## Status
 
@@ -77,7 +76,7 @@ Point Terraform at the local binary instead of a registry with a CLI config file
 # dev.tfrc
 provider_installation {
   dev_overrides {
-    "registry.terraform.io/clearcloud/okstatus" = "/absolute/path/to/this/repo"
+    "registry.terraform.io/clearcloud-fr/okstatus" = "/absolute/path/to/this/repo"
   }
   direct {}
 }

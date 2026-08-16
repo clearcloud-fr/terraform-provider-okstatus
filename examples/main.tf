@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     okstatus = {
-      source = "clearcloud/okstatus"
+      source = "clearcloud-fr/okstatus"
     }
   }
 }

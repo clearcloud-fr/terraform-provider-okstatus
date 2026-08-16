@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/clearcloud/terraform-provider-okstatus/internal/client"
+	"github.com/Clearcloud-Fr/terraform-provider-okstatus/internal/client"
 )
 
 var _ datasource.DataSource = &OrgDataSource{}

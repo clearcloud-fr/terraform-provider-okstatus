@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/clearcloud/terraform-provider-okstatus/internal/client"
+	"github.com/Clearcloud-Fr/terraform-provider-okstatus/internal/client"
 )
 
 var _ provider.Provider = &OKStatusProvider{}

@@ -1,4 +1,4 @@
-module github.com/clearcloud/terraform-provider-okstatus
+module github.com/Clearcloud-Fr/terraform-provider-okstatus
 
 go 1.25.0
 

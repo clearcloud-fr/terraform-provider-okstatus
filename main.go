@@ -9,7 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
-	"github.com/clearcloud/terraform-provider-okstatus/internal/provider"
+	"github.com/Clearcloud-Fr/terraform-provider-okstatus/internal/provider"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=x.y.z"
@@ -19,7 +19,7 @@ var version = "dev"
 
 func main() {
 	err := providerserver.Serve(context.Background(), provider.New(version), providerserver.ServeOpts{
-		Address: "registry.terraform.io/clearcloud/okstatus",
+		Address: "registry.terraform.io/clearcloud-fr/okstatus",
 	})
 	if err != nil {
 		log.Fatal(err.Error())
