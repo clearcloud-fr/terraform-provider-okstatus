@@ -41,9 +41,12 @@ func (r *AlertChannelResource) Metadata(ctx context.Context, req resource.Metada
 
 func (r *AlertChannelResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "An OKStatus alert channel. The `config` shape depends on `type` — e.g. `{ email = \"..." +
-			"\" }` for `email`, `{ webhook_url = \"...\" }` for `discord`/`slack`; ok-status-backend validates the exact " +
-			"shape per type, not this provider.",
+		MarkdownDescription: "An OKStatus alert channel. The `config` shape depends on `type` — ok-status-backend " +
+			"validates the exact shape per type (`src/api/schemas/monitors.ts`'s per-type Zod schemas), not this " +
+			"provider, and keys are the backend's own camelCase field names, not Terraform's usual snake_case: " +
+			"`{ email = \"...\" }` for `email`; `{ webhookUrl = \"...\" }` for `discord`/`slack`/`msteams` (note: " +
+			"`webhookUrl`, not `webhook_url`); `{ url = \"...\" }` (+ optional `secret`) for the generic `webhook` " +
+			"type; `{ botToken = \"...\", chatId = \"...\" }` for `telegram`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:      true,
@@ -62,7 +65,7 @@ func (r *AlertChannelResource) Schema(ctx context.Context, req resource.SchemaRe
 			"config": schema.MapAttribute{
 				Required:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: "Channel configuration, string key/value pairs (e.g. `webhook_url`, `email`). Changing it replaces the resource — api-v1 has no PATCH for config, only for `enabled`.",
+				MarkdownDescription: "Channel configuration, string key/value pairs (e.g. `webhookUrl`, `email`) — see the resource description above for the exact keys per `type`. Changing it replaces the resource — api-v1 has no PATCH for config, only for `enabled`.",
 				PlanModifiers:       []planmodifier.Map{mapplanmodifier.RequiresReplace()},
 			},
 			"enabled": schema.BoolAttribute{

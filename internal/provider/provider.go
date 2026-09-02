@@ -77,6 +77,7 @@ func (p *OKStatusProvider) Configure(ctx context.Context, req provider.Configure
 func (p *OKStatusProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewMonitorResource,
+		NewLlmMonitorResource,
 		NewIncidentResource,
 		NewStatusPageResource,
 		NewAlertChannelResource,

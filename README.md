@@ -30,6 +30,7 @@ this against production infrastructure.
 | Resource | Maps to |
 |---|---|
 | `okstatus_monitor` | `/monitors` |
+| `okstatus_llm_monitor` | `/monitors` (type `llm`) — LLM canary checks: prompt + TTFT/content assertions, single region |
 | `okstatus_incident` | `/incidents` (see note below — no plain field PATCH) |
 | `okstatus_status_page` | `/status-pages` |
 | `okstatus_alert_channel` | `/alert-channels` |

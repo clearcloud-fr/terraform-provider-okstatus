@@ -3,12 +3,12 @@
 page_title: "okstatus_alert_channel Resource - terraform-provider-okstatus"
 subcategory: ""
 description: |-
-  An OKStatus alert channel. The config shape depends on type — e.g. { email = "..." } for email, { webhook_url = "..." } for discord/slack; ok-status-backend validates the exact shape per type, not this provider.
+  An OKStatus alert channel. The config shape depends on type — ok-status-backend validates the exact shape per type (src/api/schemas/monitors.ts's per-type Zod schemas), not this provider, and keys are the backend's own camelCase field names, not Terraform's usual snake_case: { email = "..." } for email; { webhookUrl = "..." } for discord/slack/msteams (note: webhookUrl, not webhook_url); { url = "..." } (+ optional secret) for the generic webhook type; { botToken = "...", chatId = "..." } for telegram.
 ---
 
 # okstatus_alert_channel (Resource)
 
-An OKStatus alert channel. The `config` shape depends on `type` — e.g. `{ email = "..." }` for `email`, `{ webhook_url = "..." }` for `discord`/`slack`; ok-status-backend validates the exact shape per type, not this provider.
+An OKStatus alert channel. The `config` shape depends on `type` — ok-status-backend validates the exact shape per type (`src/api/schemas/monitors.ts`'s per-type Zod schemas), not this provider, and keys are the backend's own camelCase field names, not Terraform's usual snake_case: `{ email = "..." }` for `email`; `{ webhookUrl = "..." }` for `discord`/`slack`/`msteams` (note: `webhookUrl`, not `webhook_url`); `{ url = "..." }` (+ optional `secret`) for the generic `webhook` type; `{ botToken = "...", chatId = "..." }` for `telegram`.
 
 ## Example Usage
 
@@ -23,7 +23,9 @@ resource "okstatus_alert_channel" "on_call" {
 resource "okstatus_alert_channel" "team_discord" {
   type = "discord"
   config = {
-    webhook_url = "https://discord.com/api/webhooks/..."
+    # Backend field name, not Terraform's usual snake_case — webhookUrl, not
+    # webhook_url.
+    webhookUrl = "https://discord.com/api/webhooks/..."
   }
 }
 ```
@@ -33,7 +35,7 @@ resource "okstatus_alert_channel" "team_discord" {
 
 ### Required
 
-- `config` (Map of String) Channel configuration, string key/value pairs (e.g. `webhook_url`, `email`). Changing it replaces the resource — api-v1 has no PATCH for config, only for `enabled`.
+- `config` (Map of String) Channel configuration, string key/value pairs (e.g. `webhookUrl`, `email`) — see the resource description above for the exact keys per `type`. Changing it replaces the resource — api-v1 has no PATCH for config, only for `enabled`.
 - `type` (String)
 
 ### Optional

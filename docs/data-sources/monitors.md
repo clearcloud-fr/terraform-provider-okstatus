@@ -38,9 +38,11 @@ output "monitor_names" {
 
 Read-Only:
 
+- `accepted_status_codes` (List of String)
 - `id` (String)
 - `interval` (Number)
 - `name` (String)
+- `regions` (List of String)
 - `status` (String)
 - `type` (String)
 - `url` (String)

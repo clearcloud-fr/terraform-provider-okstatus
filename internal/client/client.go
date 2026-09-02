@@ -117,12 +117,41 @@ func IsNotFound(err error) bool {
 // ─── Monitors ───────────────────────────────────────────────────
 
 type Monitor struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	URL      string `json:"url"`
-	Type     string `json:"type"`
-	Interval int64  `json:"interval"`
-	Status   string `json:"status"`
+	ID                  string     `json:"id"`
+	Name                string     `json:"name"`
+	URL                 string     `json:"url"`
+	Type                string     `json:"type"`
+	Interval            int64      `json:"interval"`
+	Regions             []string   `json:"regions"`
+	AcceptedStatusCodes []string   `json:"acceptedStatusCodes"`
+	Status              string     `json:"status"`
+	LlmProvider         string     `json:"llmProvider,omitempty"`
+	LlmConfig           *LlmConfig `json:"llmConfig,omitempty"`
+}
+
+// ─── LLM monitors (OKS-266) ────────────────────────────────────
+// Mirrors ok-status-backend's llmConfigSchema (src/api/schemas/monitors.ts).
+// llmApiKey is write-only: reads come back masked as "***" (sanitize-monitor),
+// so the resource never round-trips it through the API.
+
+type LlmTimeouts struct {
+	ConnectMs    int64 `json:"connectMs"`
+	FirstTokenMs int64 `json:"firstTokenMs"`
+	TotalMs      int64 `json:"totalMs"`
+}
+
+type LlmAssertions struct {
+	TtftMsMax     int64  `json:"ttftMsMax"`
+	ContentEquals string `json:"contentEquals,omitempty"`
+	ContentRegex  string `json:"contentRegex,omitempty"`
+}
+
+type LlmConfig struct {
+	Model      string        `json:"model"`
+	Prompt     string        `json:"prompt"`
+	Region     string        `json:"region,omitempty"`
+	Timeouts   LlmTimeouts   `json:"timeouts"`
+	Assertions LlmAssertions `json:"assertions"`
 }
 
 type monitorEnvelope struct {
@@ -130,16 +159,26 @@ type monitorEnvelope struct {
 }
 
 type MonitorCreateInput struct {
-	Name     string `json:"name"`
-	URL      string `json:"url"`
-	Type     string `json:"type,omitempty"`
-	Interval int64  `json:"interval,omitempty"`
+	Name                string     `json:"name"`
+	URL                 string     `json:"url"`
+	Type                string     `json:"type,omitempty"`
+	Interval            int64      `json:"interval,omitempty"`
+	Regions             []string   `json:"regions,omitempty"`
+	AcceptedStatusCodes []string   `json:"acceptedStatusCodes,omitempty"`
+	LlmProvider         string     `json:"llmProvider,omitempty"`
+	LlmAPIKey           string     `json:"llmApiKey,omitempty"`
+	LlmConfig           *LlmConfig `json:"llmConfig,omitempty"`
 }
 
 type MonitorUpdateInput struct {
-	Name     *string `json:"name,omitempty"`
-	URL      *string `json:"url,omitempty"`
-	Interval *int64  `json:"interval,omitempty"`
+	Name                *string    `json:"name,omitempty"`
+	URL                 *string    `json:"url,omitempty"`
+	Interval            *int64     `json:"interval,omitempty"`
+	Regions             []string   `json:"regions,omitempty"`
+	AcceptedStatusCodes []string   `json:"acceptedStatusCodes,omitempty"`
+	LlmProvider         string     `json:"llmProvider,omitempty"`
+	LlmAPIKey           string     `json:"llmApiKey,omitempty"`
+	LlmConfig           *LlmConfig `json:"llmConfig,omitempty"`
 }
 
 func (c *Client) CreateMonitor(ctx context.Context, in MonitorCreateInput) (*Monitor, error) {

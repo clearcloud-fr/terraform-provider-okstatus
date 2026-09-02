@@ -5,6 +5,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/Clearcloud-Fr/terraform-provider-okstatus/internal/client"
@@ -21,12 +22,14 @@ type MonitorsDataSource struct {
 }
 
 type monitorListItemModel struct {
-	ID       types.String `tfsdk:"id"`
-	Name     types.String `tfsdk:"name"`
-	URL      types.String `tfsdk:"url"`
-	Type     types.String `tfsdk:"type"`
-	Interval types.Int64  `tfsdk:"interval"`
-	Status   types.String `tfsdk:"status"`
+	ID                  types.String `tfsdk:"id"`
+	Name                types.String `tfsdk:"name"`
+	URL                 types.String `tfsdk:"url"`
+	Type                types.String `tfsdk:"type"`
+	Interval            types.Int64  `tfsdk:"interval"`
+	Regions             types.List   `tfsdk:"regions"`
+	AcceptedStatusCodes types.List   `tfsdk:"accepted_status_codes"`
+	Status              types.String `tfsdk:"status"`
 }
 
 type monitorsDataSourceModel struct {
@@ -64,7 +67,15 @@ func (d *MonitorsDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 						"url":      schema.StringAttribute{Computed: true},
 						"type":     schema.StringAttribute{Computed: true},
 						"interval": schema.Int64Attribute{Computed: true},
-						"status":   schema.StringAttribute{Computed: true},
+						"regions": schema.ListAttribute{
+							Computed:    true,
+							ElementType: types.StringType,
+						},
+						"accepted_status_codes": schema.ListAttribute{
+							Computed:    true,
+							ElementType: types.StringType,
+						},
+						"status": schema.StringAttribute{Computed: true},
 					},
 				},
 			},
@@ -83,16 +94,28 @@ func (d *MonitorsDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
+	var diags diag.Diagnostics
 	items := make([]monitorListItemModel, 0, len(monitors))
 	for _, m := range monitors {
+		regions, d := types.ListValueFrom(ctx, types.StringType, m.Regions)
+		diags.Append(d...)
+		codes, d := types.ListValueFrom(ctx, types.StringType, m.AcceptedStatusCodes)
+		diags.Append(d...)
+
 		items = append(items, monitorListItemModel{
-			ID:       types.StringValue(m.ID),
-			Name:     types.StringValue(m.Name),
-			URL:      types.StringValue(m.URL),
-			Type:     types.StringValue(m.Type),
-			Interval: types.Int64Value(m.Interval),
-			Status:   types.StringValue(m.Status),
+			ID:                  types.StringValue(m.ID),
+			Name:                types.StringValue(m.Name),
+			URL:                 types.StringValue(m.URL),
+			Type:                types.StringValue(m.Type),
+			Interval:            types.Int64Value(m.Interval),
+			Regions:             regions,
+			AcceptedStatusCodes: codes,
+			Status:              types.StringValue(m.Status),
 		})
+	}
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	data := monitorsDataSourceModel{
