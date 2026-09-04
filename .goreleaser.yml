@@ -62,11 +62,12 @@ release:
     - glob: "terraform-registry-manifest.json"
       name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
   # Immutable releases are enabled on the repo: a published release can never
-  # receive assets afterwards. Create it as a draft with every asset attached,
-  # then publish from the GitHub UI (see README "Releasing"). Never create the
-  # release by hand before the tag push — GoReleaser then fails with
-  # "already exists and is immutable".
-  draft: true
+  # receive assets afterwards. GoReleaser (>= 2.18) handles that itself: it
+  # creates the release as a draft, uploads every asset, then publishes it —
+  # fully automatic, nothing to click. Never create or publish a release from
+  # the GitHub UI: a hand-made release for the tag is empty and immutable, and
+  # the tag name is burned (v1.4.0, v1.5.0, v1.5.1 died that way).
+  draft: false
   # If the workflow is re-run for a tag that already has a draft, keep it and
   # replace the assets instead of failing.
   mode: replace

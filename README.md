@@ -80,23 +80,20 @@ toolchain on `PATH` first).
 
 The repository has GitHub **immutable releases** enabled: once a release is published its
 tag and assets are frozen forever, and a tag name can never be reused (even after deleting
-the release). That is why creating the release from the GitHub UI breaks the pipeline: the
-UI publishes an empty, immutable release for the tag *before* the `Release` workflow runs,
-and GoReleaser then fails with `release vX.Y.Z already exists and is immutable, it cannot
-be updated`. `v1.5.0` was burned that way — the next version is `v1.5.1`.
+the release). Any release created or published **from the GitHub UI** is therefore empty
+and dead, and burns its tag — that is how `v1.4.0`, `v1.5.0` and `v1.5.1` were lost.
 
-Never create the release in the UI. Push the tag and let GoReleaser create the release:
+The only thing to do is push a tag. Nothing else, no UI:
 
 ```bash
-git tag v1.5.1
-git push origin v1.5.1
+git tag v1.5.2
+git push origin v1.5.2
 ```
 
-The workflow builds every platform, uploads the zips, checksums, manifest and signature,
-and creates the release **as a draft** (`release.draft: true` in `.goreleaser.yml` — the
-flow GitHub recommends with immutable releases). Open the draft on GitHub, add notes if you
-want, and click **Publish release**; it becomes immutable at that moment, with every asset
-already attached, and the Terraform Registry picks it up from there.
+The `Release` workflow (GoReleaser) builds every platform, creates the release as a draft,
+attaches the zips, checksums, manifest and signature, then publishes it itself. About five
+minutes later the release is live on GitHub and the Terraform Registry picks it up on its
+next sync (Settings → Resync on the registry if you are in a hurry).
 
 ## `okstatus_incident` is not a normal CRUD resource
 
