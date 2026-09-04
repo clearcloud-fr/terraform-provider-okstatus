@@ -61,7 +61,14 @@ release:
   extra_files:
     - glob: "terraform-registry-manifest.json"
       name_template: "{{ .ProjectName }}_{{ .Version }}_manifest.json"
-  # Uncomment to review the release before it goes live:
-  # draft: true
+  # Immutable releases are enabled on the repo: a published release can never
+  # receive assets afterwards. Create it as a draft with every asset attached,
+  # then publish from the GitHub UI (see README "Releasing"). Never create the
+  # release by hand before the tag push — GoReleaser then fails with
+  # "already exists and is immutable".
+  draft: true
+  # If the workflow is re-run for a tag that already has a draft, keep it and
+  # replace the assets instead of failing.
+  mode: replace
 changelog:
   disable: true

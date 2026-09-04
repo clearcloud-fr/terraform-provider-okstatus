@@ -76,6 +76,28 @@ it if your local `go` is older enough to still understand the 3-component `go` d
 itself; a `go` older than 1.21 can't bootstrap that automatically and needs a manual newer
 toolchain on `PATH` first).
 
+## Releasing
+
+The repository has GitHub **immutable releases** enabled: once a release is published its
+tag and assets are frozen forever, and a tag name can never be reused (even after deleting
+the release). That is why creating the release from the GitHub UI breaks the pipeline: the
+UI publishes an empty, immutable release for the tag *before* the `Release` workflow runs,
+and GoReleaser then fails with `release vX.Y.Z already exists and is immutable, it cannot
+be updated`. `v1.5.0` was burned that way — the next version is `v1.5.1`.
+
+Never create the release in the UI. Push the tag and let GoReleaser create the release:
+
+```bash
+git tag v1.5.1
+git push origin v1.5.1
+```
+
+The workflow builds every platform, uploads the zips, checksums, manifest and signature,
+and creates the release **as a draft** (`release.draft: true` in `.goreleaser.yml` — the
+flow GitHub recommends with immutable releases). Open the draft on GitHub, add notes if you
+want, and click **Publish release**; it becomes immutable at that moment, with every asset
+already attached, and the Terraform Registry picks it up from there.
+
 ## `okstatus_incident` is not a normal CRUD resource
 
 `PATCH /incidents/:id` doesn't accept arbitrary field updates — it appends a timeline entry
