@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -27,6 +28,9 @@ func New(endpoint, apiKey string) *Client {
 	if endpoint == "" {
 		endpoint = DefaultEndpoint
 	}
+	// Trailing slash on a user-supplied endpoint would double up against the
+	// leading slash of every path (".../api/v1//monitors"). Trim it once here.
+	endpoint = strings.TrimRight(endpoint, "/")
 	return &Client{
 		endpoint:   endpoint,
 		apiKey:     apiKey,

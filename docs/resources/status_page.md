@@ -18,7 +18,7 @@ resource "okstatus_status_page" "public" {
   title        = "Example Inc. Status"
   description  = "Live status of Example Inc.'s services."
   theme        = "auto"
-  accent_color = "#00e676"
+  accent_color = "#00e599"
   published    = true
 }
 ```
@@ -33,7 +33,7 @@ resource "okstatus_status_page" "public" {
 
 ### Optional
 
-- `accent_color` (String) Hex color, e.g. `#00e676`. Defaults to OKStatus's own default.
+- `accent_color` (String) Hex color, e.g. `#00e599`. Defaults to OKStatus's own default.
 - `auto_refresh_interval` (Number) Seconds between automatic page refreshes (30-3600).
 - `custom_css` (String)
 - `custom_domain` (String)

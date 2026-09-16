@@ -72,9 +72,9 @@ func (r *StatusPageResource) Schema(ctx context.Context, req resource.SchemaRequ
 			"favicon_url": schema.StringAttribute{Optional: true, Computed: true, PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"accent_color": schema.StringAttribute{
 				Optional: true, Computed: true,
-				MarkdownDescription: "Hex color, e.g. `#00e676`. Defaults to OKStatus's own default.",
+				MarkdownDescription: "Hex color, e.g. `#00e599`. Defaults to OKStatus's own default.",
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(regexp.MustCompile(`^#[0-9a-fA-F]{6}$`), "must be a 6-digit hex color like #00e676"),
+					stringvalidator.RegexMatches(regexp.MustCompile(`^#[0-9a-fA-F]{6}$`), "must be a 6-digit hex color like #00e599"),
 				},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},

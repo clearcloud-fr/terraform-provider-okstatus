@@ -1,0 +1,36 @@
+# Revue sécurité 2026-09-16 — jusqu'ici le dépôt n'avait qu'un workflow de
+# release (sur tag) : ni build ni test ne tournaient sur les commits ordinaires.
+# Ce workflow compile, vérifie le formatage, `go vet` et les tests unitaires à
+# chaque push et pull request. Les tests d'acceptation (TF_ACC) ne sont pas ici :
+# ils exigent une org OKStatus et une clé API.
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+      - name: gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "Fichiers non formatés :"; echo "$unformatted"; exit 1
+          fi
+      - name: go vet
+        run: go vet ./...
+      - name: build
+        run: go build ./...
+      - name: test
+        run: go test -race ./...
