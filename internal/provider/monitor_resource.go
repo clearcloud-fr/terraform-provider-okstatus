@@ -52,13 +52,16 @@ type monitorResourceModel struct {
 // (customer-deployed private agents, OKS-401). The old bare country codes
 // (fr, de, nl, …) stay accepted as dual-accept shims for one release.
 var validRegionCodes = []string{
-	"fr-dc3", "fr-rbx", "fr-sbg", "fr-gra",
+	"fr-dc3", "fr-sbg", "ie-dub", "dk-cph",
 	"de-fra", "nl-ams", "es-mad", "se-sto", "pl-waw", "ch-zrh", "uk-lon", "it-mil",
 	"ca-bhs", "us-hil", "br-sao", "cl-scl", "sg-sgp", "in-mum", "bh-man", "qa-doh",
 	"za-cpt", "za-jnb", "au-syd", "au-mel",
 	// deprecated dual-accept shims (renamed to cc-city on 2026-08-29)
 	"fr", "de", "nl", "es", "se", "pl", "ch", "uk", "it",
 	"ca", "us", "br", "cl", "sg", "in", "bh", "qa",
+	// deprecated 2026-10-04: Roubaix → ie-dub, Gravelines → dk-cph (the
+	// backend stores the replacement)
+	"fr-rbx", "fr-gra",
 	"private",
 }
 
@@ -104,7 +107,7 @@ func (r *MonitorResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Computed:    true,
 				ElementType: types.StringType,
 				MarkdownDescription: "Regions to check from — your main region plus secondary regions (max 5 per " +
-					"monitor). Any of the 24 public region codes (`fr-dc3`, `fr-rbx`, `fr-sbg`, `fr-gra`, " +
+					"monitor). Any of the 24 public region codes (`fr-dc3`, `fr-sbg`, `ie-dub`, `dk-cph`, " +
 					"`de-fra`, `nl-ams`, `es-mad`, `se-sto`, `pl-waw`, `ch-zrh`, `uk-lon`, `it-mil`, `ca-bhs`, " +
 					"`us-hil`, `br-sao`, `cl-scl`, `sg-sgp`, `in-mum`, `za-cpt`, " +
 					"`za-jnb`, `au-syd`, `au-mel`, `bh-man`, `qa-doh`) or `private` (your own deployed agents); " +

@@ -35,7 +35,7 @@ resource "okstatus_monitor" "api" {
 
 - `accepted_status_codes` (List of String) HTTP status codes (or ranges, e.g. `"200-299"`) treated as a successful check. Defaults to `["200-299"]`. Only meaningful for `type = "http"`.
 - `interval` (Number) Check interval in seconds (minimum 30). Defaults to 60.
-- `regions` (List of String) Regions to check from — your main region plus secondary regions (max 5 per monitor). Any of the 24 public region codes (`fr`, `fr-dc3`, `fr-rbx`, `fr-sbg`, `fr-gra`, `de`, `nl`, `es`, `se`, `pl`, `ch`, `uk`, `it`, `ca`, `us`, `br`, `cl`, `sg`, `in`, `za-cpt`, `za-jnb`, `au-syd`, `au-mel`, `bh`, `qa`) or `private` (your own deployed agents). Defaults to `["fr", "de", "nl"]`. Which of these your plan actually allows is enforced server-side (`PLAN_ALLOWED_REGIONS`) — a region your plan doesn't include fails at `apply` with a 400, not at `plan`.
+- `regions` (List of String) Regions to check from — your main region plus secondary regions (max 5 per monitor). Any of the 24 public region codes (`fr`, `fr-dc3`, `fr-sbg`, `ie-dub`, `dk-cph`, `de`, `nl`, `es`, `se`, `pl`, `ch`, `uk`, `it`, `ca`, `us`, `br`, `cl`, `sg`, `in`, `za-cpt`, `za-jnb`, `au-syd`, `au-mel`, `bh`, `qa`) or `private` (your own deployed agents). Defaults to `["fr", "de", "nl"]`. Which of these your plan actually allows is enforced server-side (`PLAN_ALLOWED_REGIONS`) — a region your plan doesn't include fails at `apply` with a 400, not at `plan`.
 - `type` (String) Check type: `http`, `tcp`, `ping`, or `dns`. Defaults to `http`.
 
 ### Read-Only
