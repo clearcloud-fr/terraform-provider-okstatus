@@ -29,6 +29,7 @@ type monitorListItemModel struct {
 	Interval            types.Int64  `tfsdk:"interval"`
 	Regions             types.List   `tfsdk:"regions"`
 	AcceptedStatusCodes types.List   `tfsdk:"accepted_status_codes"`
+	Tags                types.Set    `tfsdk:"tags"`
 	Status              types.String `tfsdk:"status"`
 }
 
@@ -75,6 +76,10 @@ func (d *MonitorsDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 							Computed:    true,
 							ElementType: types.StringType,
 						},
+						"tags": schema.SetAttribute{
+							Computed:    true,
+							ElementType: types.StringType,
+						},
 						"status": schema.StringAttribute{Computed: true},
 					},
 				},
@@ -110,6 +115,7 @@ func (d *MonitorsDataSource) Read(ctx context.Context, req datasource.ReadReques
 			Interval:            types.Int64Value(m.Interval),
 			Regions:             regions,
 			AcceptedStatusCodes: codes,
+			Tags:                stringSet(ctx, m.Tags, &diags),
 			Status:              types.StringValue(m.Status),
 		})
 	}

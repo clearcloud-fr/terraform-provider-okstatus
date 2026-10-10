@@ -108,7 +108,7 @@ func (r *LlmMonitorResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "The single region the canary runs from (LLM monitors are " +
 					"single-region by design). Defaults to `fr-dc3`.",
 				Validators: []validator.String{
-					stringvalidator.OneOf(validRegionCodes...),
+					regionValidator(),
 				},
 			},
 			"interval": schema.Int64Attribute{

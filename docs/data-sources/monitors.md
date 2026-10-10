@@ -44,5 +44,6 @@ Read-Only:
 - `name` (String)
 - `regions` (List of String)
 - `status` (String)
+- `tags` (Set of String)
 - `type` (String)
 - `url` (String)

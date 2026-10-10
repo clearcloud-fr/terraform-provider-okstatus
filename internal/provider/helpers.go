@@ -3,6 +3,7 @@ package provider
 import (
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
@@ -51,4 +52,34 @@ func stringPtrOrNil(s types.String) *string {
 func stringPtrVal(s types.String) *string {
 	v := s.ValueString()
 	return &v
+}
+
+// known reports whether a planned value was actually decided — neither left
+// out of the configuration (null) nor still to be computed (unknown).
+func known(v attr.Value) bool {
+	return !v.IsNull() && !v.IsUnknown()
+}
+
+func boolPtrOrNil(b types.Bool) *bool {
+	if !known(b) {
+		return nil
+	}
+	v := b.ValueBool()
+	return &v
+}
+
+func int64PtrOrNil(i types.Int64) *int64 {
+	if !known(i) {
+		return nil
+	}
+	v := i.ValueInt64()
+	return &v
+}
+
+// stringOrEmpty maps an absent API string to "" (see writeMonitor).
+func stringOrEmpty(s *string) types.String {
+	if s == nil {
+		return types.StringValue("")
+	}
+	return types.StringValue(*s)
 }

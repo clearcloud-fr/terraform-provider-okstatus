@@ -3,7 +3,7 @@
 page_title: "okstatus_llm_monitor Resource - terraform-provider-okstatus"
 subcategory: ""
 description: |-
-  An OKStatus LLM canary monitor: a scheduled prompt against an LLM provider endpoint, asserting time-to-first-token and (optionally) the response content.
+  An OKStatus LLM canary monitor: a scheduled prompt against an LLM provider endpoint, asserting time-to-first-token and (optionally) the response content. LLM monitors run from a single region — each region multiplies real token spend on your provider account.
 ---
 
 # okstatus_llm_monitor (Resource)
@@ -46,18 +46,10 @@ resource "okstatus_llm_monitor" "openai_canary" {
 - `interval` (Number) Check interval in seconds (minimum 30). Defaults to 300.
 - `llm_provider` (String) Request/stream format: `openai-compatible` (OpenAI, Azure OpenAI, Mistral, Groq, self-hosted vLLM/TGI, …), `anthropic`, or `bedrock`. Defaults to `openai-compatible`.
 - `prompt` (String) Prompt sent on every check. Defaults to `Reply with only the word: PONG`.
-- `region` (String) The single region the canary runs from (LLM monitors are single-region by design). Defaults to `fr`.
+- `region` (String) The single region the canary runs from (LLM monitors are single-region by design). Defaults to `fr-dc3`.
 - `ttft_ms_max` (Number) Maximum acceptable time-to-first-token in milliseconds — slower checks report `degraded`. Defaults to 1500.
 
 ### Read-Only
 
 - `id` (String) Monitor ID.
 - `status` (String) Current monitor status as last reported by OKStatus (`pending`, `active`, `paused`, `down`).
-
-## Import
-
-```shell
-terraform import okstatus_llm_monitor.openai_canary <monitor-id>
-```
-
-`api_key` can't be recovered from the API (it is masked on read) — set it in the configuration after import; the first plan will then update it in place.

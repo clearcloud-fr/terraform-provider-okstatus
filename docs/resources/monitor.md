@@ -3,12 +3,12 @@
 page_title: "okstatus_monitor Resource - terraform-provider-okstatus"
 subcategory: ""
 description: |-
-  An OKStatus monitor (HTTP, TCP, ping or DNS check).
+  An OKStatus monitor: HTTP, TCP, ping, DNS, gRPC, database (PostgreSQL, MySQL, MongoDB), SMTP, IMAP, Redis, push (heartbeat) or group. AI model monitors have their own resource, okstatus_llm_monitor.
 ---
 
 # okstatus_monitor (Resource)
 
-An OKStatus monitor (HTTP, TCP, ping or DNS check).
+An OKStatus monitor: HTTP, TCP, ping, DNS, gRPC, database (PostgreSQL, MySQL, MongoDB), SMTP, IMAP, Redis, push (heartbeat) or group. AI model monitors have their own resource, `okstatus_llm_monitor`.
 
 ## Example Usage
 
@@ -18,8 +18,85 @@ resource "okstatus_monitor" "api" {
   url                   = "https://api.example.com/health"
   type                  = "http"
   interval              = 60
-  regions               = ["fr", "de", "nl"]
+  regions               = ["fr-dc3", "de-fra", "nl-ams"]
   accepted_status_codes = ["200-299"]
+
+  tags              = ["prod", "payments"]
+  keyword           = "\"status\":\"ok\""
+  follow_redirects  = false
+  alert_channel_ids = [okstatus_alert_channel.team_discord.id]
+}
+
+# A POST with a body and a token header (the header is never shown in a plan).
+resource "okstatus_monitor" "webhook" {
+  name               = "Order webhook"
+  url                = "https://api.example.com/orders/ping"
+  http_method        = "POST"
+  http_body          = jsonencode({ ping = true })
+  http_body_encoding = "json"
+  http_headers       = { Authorization = "Bearer ${var.probe_token}" }
+}
+
+# An API behind OAuth2 client credentials, judged on its JSON answer.
+resource "okstatus_monitor" "partner_api" {
+  name = "Partner API"
+  url  = "https://partner.example.com/health"
+
+  auth = {
+    type          = "oauth2"
+    token_url     = "https://login.example.com/oauth/token"
+    client_id     = "okstatus-probe"
+    client_secret = var.partner_client_secret
+  }
+
+  json_path           = "$.status"
+  json_operator       = "=="
+  json_expected_value = "ok"
+}
+
+# A PostgreSQL check with a read-only account (never put it in the URL).
+resource "okstatus_monitor" "orders_db" {
+  name                = "Orders database"
+  url                 = "postgres://db.example.com:5432/orders"
+  type                = "postgres"
+  db_query            = "SELECT 1"
+  basic_auth_user     = "okstatus_ro"
+  basic_auth_password = var.orders_db_password
+}
+
+# A heartbeat: the nightly job calls the ping URL when it succeeds.
+resource "okstatus_monitor" "backup" {
+  name         = "Nightly backup"
+  url          = "nightly-backup"
+  type         = "push"
+  interval     = 86400
+  grace_period = 3600
+}
+
+output "backup_push_token" {
+  value     = okstatus_monitor.backup.push_token
+  sensitive = true
+}
+
+# A DNS check, paused until the record is published.
+resource "okstatus_monitor" "spf" {
+  name               = "SPF record"
+  url                = "example.com"
+  type               = "dns"
+  dns_record_type    = "TXT"
+  dns_expected_value = "v=spf1"
+  paused             = true
+}
+
+# A TCP check run by one of your private agents.
+data "okstatus_private_agents" "all" {}
+
+resource "okstatus_monitor" "database" {
+  name    = "Internal database"
+  url     = "db.internal.example.com"
+  type    = "tcp"
+  port    = 5432
+  regions = [data.okstatus_private_agents.all.agents[0].region]
 }
 ```
 
@@ -29,16 +106,68 @@ resource "okstatus_monitor" "api" {
 ### Required
 
 - `name` (String) Display name.
-- `url` (String) Target URL to check.
+- `url` (String) The target: an `http(s)://` URL for `http`, a host for `ping`, `tcp`, `dns` and `grpc` (`example.com`, `grpc.example.com:443`), a connection URL for databases (`postgres://db.example.com:5432/app`), a host or `smtp://` / `imap://` / `redis://` URL for those, a free label for `push` and `group`. Never put a user and password in it: use `basic_auth_user` / `basic_auth_password`.
 
 ### Optional
 
 - `accepted_status_codes` (List of String) HTTP status codes (or ranges, e.g. `"200-299"`) treated as a successful check. Defaults to `["200-299"]`. Only meaningful for `type = "http"`.
+- `alert_channel_ids` (Set of String) The complete set of alert channels attached to the monitor (ids of `okstatus_alert_channel` resources or of `data.okstatus_alert_channels`); `[]` detaches them all. Left out, Terraform does not manage the monitor's channels at all — whatever is attached in the dashboard, or inherited from a monitor group, stays. If the monitor is in an `okstatus_monitor_group` that has its own `alert_channel_ids`, list those here too: a monitor joining a group receives the group's channels.
+- `auth` (Attributes) `http` only: authentication other than Basic. Write the attributes of the chosen `type`: `bearer` → `token`; `apikey` → `name`, `value`, `in`; `cookie` → `cookie`; `oauth2` (client credentials) → `token_url`, `client_id`, `client_secret`, optionally `scope`, `audience`, `auth_style`; `mtls` → `cert`, `key`, optionally `ca`. Secrets are never returned by OKStatus: Terraform sends the block when it changes and cannot see an edit made in the dashboard. Removing the block removes the authentication. (see [below for nested schema](#nestedatt--auth))
+- `basic_auth_password` (String, Sensitive) Password that goes with `basic_auth_user`.
+- `basic_auth_user` (String) User of the monitored endpoint: HTTP Basic auth, or the account of a database, SMTP, IMAP or Redis monitor. Like every credential here, OKStatus never returns it: Terraform sends it when it changes, and removes it from the monitor when you remove the attribute.
+- `child_monitor_ids` (Set of String) `group` only: the monitors this one aggregates (1 to 50).
+- `db_query` (String) `postgres`, `mysql`, `mongodb`: query run on each check (SQL, or a MongoDB command as JSON). `""` removes it — the check then only connects.
+- `dns_expected_value` (String) `dns` only: value the answer must contain. `""` removes the expectation; left out, the current one is kept.
+- `dns_record_type` (String) `dns` only: record type to query — `A`, `AAAA`, `CNAME`, `MX`, `NS`, `TXT`, `SOA`, `CAA` or `SRV`.
+- `dns_server` (String) `dns` only: resolver to query instead of the default one. `""` goes back to the default.
+- `follow_redirects` (Boolean) `http` only: follow 3xx redirects (the default for a new monitor) instead of judging the redirect response itself.
+- `grace_period` (Number) `push` only: seconds without a ping before the monitor is down (defaults to `interval`). Set at creation: changing it replaces the monitor, and so its `push_token`.
+- `http_body` (String) `http` only: request body (10 000 characters at most). `""` removes it; left out, the current body is kept.
+- `http_body_encoding` (String) `http` only: how `http_body` is sent — `json`, `form`, `xml` or `text` (sets the `Content-Type`).
+- `http_headers` (Map of String, Sensitive) `http` only: request headers, e.g. `{ Authorization = "Bearer …" }`. Sensitive: OKStatus never returns them, so Terraform cannot detect a change made in the dashboard — it sends the headers when this attribute changes. Removing the attribute (or `{}`) removes the headers Terraform had set.
+- `http_method` (String) `http` only: request method — `GET` (what a new monitor uses), `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD` or `OPTIONS`.
+- `ignore_tls` (Boolean) `http` only: accept an invalid or self-signed certificate.
 - `interval` (Number) Check interval in seconds (minimum 30). Defaults to 60.
-- `regions` (List of String) Regions to check from — your main region plus secondary regions (max 5 per monitor). Any of the 24 public region codes (`fr`, `fr-dc3`, `fr-sbg`, `ie-dub`, `dk-cph`, `de`, `nl`, `es`, `se`, `pl`, `ch`, `uk`, `it`, `ca`, `us`, `br`, `cl`, `sg`, `in`, `za-cpt`, `za-jnb`, `au-syd`, `au-mel`, `bh`, `qa`) or `private` (your own deployed agents). Defaults to `["fr", "de", "nl"]`. Which of these your plan actually allows is enforced server-side (`PLAN_ALLOWED_REGIONS`) — a region your plan doesn't include fails at `apply` with a 400, not at `plan`.
-- `type` (String) Check type: `http`, `tcp`, `ping`, or `dns`. Defaults to `http`.
+- `json_expected_value` (String) Value the JSON path is compared with.
+- `json_operator` (String) `==`, `!=`, `>`, `<`, `>=`, `<=` or `contains`.
+- `json_path` (String) `http` only: path of the value to check in a JSON response (e.g. `$.status`), with `json_operator` and `json_expected_value`. Cannot be combined with `keyword`. `""` removes the assertion.
+- `keyword` (String) `http` only: text the response body must contain. `""` removes the check; left out, the current keyword is kept.
+- `keyword_invert` (Boolean) `http` only: `true` makes the monitor down when `keyword` **is** found.
+- `muted` (Boolean) `true` stops the alerts while the checks keep running. Left out, the monitor stays as it is.
+- `paused` (Boolean) `true` stops the checks, `false` resumes them. Left out, the monitor stays as it is.
+- `port` (Number) `tcp` only: port to connect to.
+- `regions` (List of String) Regions to check from — your main region plus secondary regions (max 5 per monitor). Any of the 24 public region codes (`fr-dc3`, `fr-sbg`, `ie-dub`, `dk-cph`, `de-fra`, `nl-ams`, `es-mad`, `se-sto`, `pl-waw`, `ch-zrh`, `uk-lon`, `it-mil`, `ca-bhs`, `us-hil`, `br-sao`, `cl-scl`, `sg-sgp`, `in-mum`, `za-cpt`, `za-jnb`, `au-syd`, `au-mel`, `bh-man`, `qa-doh`), `private` (any of your own deployed agents) or `private:<agent id>` (one agent — the `region` attribute of `data.okstatus_private_agents`); the pre-rename bare country codes (`fr`, `de`, `nl`, …) are still accepted but deprecated. Defaults to `["fr-dc3"]`. Which of these your plan actually allows is enforced server-side (`PLAN_ALLOWED_REGIONS`) — a region your plan doesn't include fails at `apply` with a 400, not at `plan`.
+- `retries` (Number) Consecutive failed checks tolerated before the monitor is down (0–5; a new monitor uses 1).
+- `severity_3xx` (String) `http` only: a redirect response that is not accepted counts as `degraded` (what a new monitor uses) or `down`.
+- `tags` (Set of String) Tags (5 at most, 30 characters each). Left out, the monitor's current tags are kept; `[]` removes them all. If your organization lowercases tags (Settings → Tags), write them in lowercase here, or `apply` reports an inconsistent result.
+- `type` (String) Check type: `http`, `tcp`, `ping`, `dns`, `grpc`, `push`, `group`, `postgres`, `mysql`, `mongodb`, `smtp`, `imap` or `redis`. Defaults to `http`. Which types your plan includes is enforced at `apply`. Changing it replaces the monitor: a type cannot be changed afterwards.
 
 ### Read-Only
 
 - `id` (String) Monitor ID.
+- `push_token` (String, Sensitive) `push` only: the token of the monitor's ping URL (`/push/<token>` on the address shown on the monitor's page). Anyone holding it can report the job as alive.
 - `status` (String) Current monitor status as last reported by OKStatus (`pending`, `active`, `paused`, `down`).
+
+<a id="nestedatt--auth"></a>
+### Nested Schema for `auth`
+
+Required:
+
+- `type` (String) `bearer`, `apikey`, `cookie`, `oauth2` or `mtls`.
+
+Optional:
+
+- `audience` (String) `oauth2`: requested audience.
+- `auth_style` (String) `oauth2`: how the client authenticates to the token endpoint — `basic` (default) or `post`.
+- `ca` (String) `mtls`: CA certificate to verify the server with, PEM.
+- `cert` (String) `mtls`: client certificate, PEM.
+- `client_id` (String) `oauth2`: client id.
+- `client_secret` (String, Sensitive) `oauth2`: client secret.
+- `cookie` (String, Sensitive) `cookie`: the `Cookie` header value, e.g. `session=…; csrf=…`.
+- `in` (String) `apikey`: `header` (default) or `query`.
+- `key` (String, Sensitive) `mtls`: unencrypted private key, PEM (PKCS#8).
+- `name` (String) `apikey`: name of the header or query parameter.
+- `scope` (String) `oauth2`: requested scope.
+- `token` (String, Sensitive) `bearer`: the token, without the `Bearer ` prefix.
+- `token_url` (String) `oauth2`: token endpoint.
+- `value` (String, Sensitive) `apikey`: the key.

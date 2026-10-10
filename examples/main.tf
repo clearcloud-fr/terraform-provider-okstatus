@@ -16,8 +16,11 @@ resource "okstatus_monitor" "api" {
   url                   = "https://api.example.com/health"
   type                  = "http"
   interval              = 60
-  regions               = ["fr", "de", "nl"]
+  regions               = ["fr-dc3", "de-fra", "nl-ams"]
   accepted_status_codes = ["200-299"]
+  tags                  = ["prod"]
+  keyword               = "ok"
+  alert_channel_ids     = [okstatus_alert_channel.on_call.id]
 }
 
 resource "okstatus_monitor" "website" {
@@ -32,6 +35,11 @@ resource "okstatus_alert_channel" "on_call" {
   config = {
     email = "on-call@example.com"
   }
+}
+
+resource "okstatus_monitor_group" "production" {
+  name        = "Production"
+  monitor_ids = [okstatus_monitor.api.id, okstatus_monitor.website.id]
 }
 
 resource "okstatus_status_page" "public" {
@@ -75,4 +83,16 @@ data "okstatus_alert_channels" "all" {}
 
 output "alert_channel_count" {
   value = data.okstatus_alert_channels.all.total
+}
+
+data "okstatus_monitor_groups" "all" {}
+
+output "monitor_group_count" {
+  value = data.okstatus_monitor_groups.all.total
+}
+
+data "okstatus_private_agents" "all" {}
+
+output "private_agent_count" {
+  value = data.okstatus_private_agents.all.total
 }

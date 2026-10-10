@@ -34,7 +34,7 @@ func (p *OKStatusProvider) Metadata(ctx context.Context, req provider.MetadataRe
 
 func (p *OKStatusProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manage OKStatus (okstatus.eu) monitors, incidents, status pages, alert channels and maintenances as code.",
+		MarkdownDescription: "Manage OKStatus (okstatus.eu) monitors, monitor groups, incidents, status pages, alert channels and maintenances as code.",
 		Attributes: map[string]schema.Attribute{
 			"endpoint": schema.StringAttribute{
 				MarkdownDescription: "OKStatus API base URL. Defaults to `" + client.DefaultEndpoint + "`.",
@@ -78,6 +78,7 @@ func (p *OKStatusProvider) Resources(ctx context.Context) []func() resource.Reso
 	return []func() resource.Resource{
 		NewMonitorResource,
 		NewLlmMonitorResource,
+		NewMonitorGroupResource,
 		NewIncidentResource,
 		NewStatusPageResource,
 		NewAlertChannelResource,
@@ -90,6 +91,8 @@ func (p *OKStatusProvider) DataSources(ctx context.Context) []func() datasource.
 		NewOrgDataSource,
 		NewMonitorsDataSource,
 		NewAlertChannelsDataSource,
+		NewMonitorGroupsDataSource,
+		NewPrivateAgentsDataSource,
 	}
 }
 

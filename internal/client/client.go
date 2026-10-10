@@ -131,6 +131,34 @@ type Monitor struct {
 	Status              string     `json:"status"`
 	LlmProvider         string     `json:"llmProvider,omitempty"`
 	LlmConfig           *LlmConfig `json:"llmConfig,omitempty"`
+	// Settings shared with the dashboard and the MCP connector (v1.6). Each
+	// is nullable server-side except tags.
+	Tags             []string `json:"tags"`
+	IsMuted          *bool    `json:"isMuted"`
+	Keyword          *string  `json:"keyword"`
+	FollowRedirects  *bool    `json:"followRedirects"`
+	Port             *int64   `json:"port"`
+	DNSRecordType    *string  `json:"dnsRecordType"`
+	DNSExpectedValue *string  `json:"dnsExpectedValue"`
+	// HTTP request options. httpHeaders is deliberately absent: the API
+	// returns it masked ("***"), so there is nothing to read back.
+	HTTPMethod       *string `json:"httpMethod"`
+	HTTPBody         *string `json:"httpBody"`
+	HTTPBodyEncoding *string `json:"httpBodyEncoding"`
+	IgnoreTLS        *bool   `json:"ignoreTls"`
+	// Assertions and per-type settings. basicAuthUser/Pass and authConfig
+	// are absent for the same reason as httpHeaders: they come back masked.
+	Retries           *int64   `json:"retries"`
+	Severity3xx       *string  `json:"severity3xx"`
+	KeywordInvert     *bool    `json:"keywordInvert"`
+	JSONPath          *string  `json:"jsonPath"`
+	JSONOperator      *string  `json:"jsonOperator"`
+	JSONExpectedValue *string  `json:"jsonExpectedValue"`
+	DNSServer         *string  `json:"dnsServer"`
+	DBQuery           *string  `json:"dbQuery"`
+	GracePeriod       *int64   `json:"gracePeriod"`
+	ChildMonitorIDs   []string `json:"childMonitorIds"`
+	PushToken         *string  `json:"pushToken"`
 }
 
 // ─── LLM monitors (OKS-266) ────────────────────────────────────
@@ -172,6 +200,33 @@ type MonitorCreateInput struct {
 	LlmProvider         string     `json:"llmProvider,omitempty"`
 	LlmAPIKey           string     `json:"llmApiKey,omitempty"`
 	LlmConfig           *LlmConfig `json:"llmConfig,omitempty"`
+	Tags                []string   `json:"tags,omitempty"`
+	Keyword             string     `json:"keyword,omitempty"`
+	FollowRedirects     *bool      `json:"followRedirects,omitempty"`
+	Port                *int64     `json:"port,omitempty"`
+	DNSRecordType       string     `json:"dnsRecordType,omitempty"`
+	DNSExpectedValue    string     `json:"dnsExpectedValue,omitempty"`
+	HTTPMethod          string     `json:"httpMethod,omitempty"`
+	HTTPBody            string     `json:"httpBody,omitempty"`
+	HTTPBodyEncoding    string     `json:"httpBodyEncoding,omitempty"`
+	// nil = not sent; an empty map is not sent either (nothing to store).
+	HTTPHeaders map[string]string `json:"httpHeaders,omitempty"`
+	IgnoreTLS   *bool             `json:"ignoreTls,omitempty"`
+
+	Retries           *int64   `json:"retries,omitempty"`
+	Severity3xx       string   `json:"severity3xx,omitempty"`
+	KeywordInvert     *bool    `json:"keywordInvert,omitempty"`
+	JSONPath          string   `json:"jsonPath,omitempty"`
+	JSONOperator      string   `json:"jsonOperator,omitempty"`
+	JSONExpectedValue string   `json:"jsonExpectedValue,omitempty"`
+	DNSServer         string   `json:"dnsServer,omitempty"`
+	DBQuery           string   `json:"dbQuery,omitempty"`
+	GracePeriod       *int64   `json:"gracePeriod,omitempty"`
+	ChildMonitorIDs   []string `json:"childMonitorIds,omitempty"`
+	BasicAuthUser     string   `json:"basicAuthUser,omitempty"`
+	BasicAuthPass     string   `json:"basicAuthPass,omitempty"`
+	// AuthConfig uses the API's own field names (type, token, tokenUrl, …).
+	AuthConfig map[string]string `json:"authConfig,omitempty"`
 }
 
 type MonitorUpdateInput struct {
@@ -183,6 +238,59 @@ type MonitorUpdateInput struct {
 	LlmProvider         string     `json:"llmProvider,omitempty"`
 	LlmAPIKey           string     `json:"llmApiKey,omitempty"`
 	LlmConfig           *LlmConfig `json:"llmConfig,omitempty"`
+	// A pointer to an empty slice is sent as [] (removes every tag); nil
+	// leaves the tags untouched.
+	Tags *[]string `json:"tags,omitempty"`
+	// "active" or "paused".
+	Status           *string `json:"status,omitempty"`
+	IsMuted          *bool   `json:"isMuted,omitempty"`
+	Keyword          *string `json:"keyword,omitempty"`
+	FollowRedirects  *bool   `json:"followRedirects,omitempty"`
+	Port             *int64  `json:"port,omitempty"`
+	DNSRecordType    *string `json:"dnsRecordType,omitempty"`
+	DNSExpectedValue *string `json:"dnsExpectedValue,omitempty"`
+	HTTPMethod       *string `json:"httpMethod,omitempty"`
+	HTTPBody         *string `json:"httpBody,omitempty"`
+	HTTPBodyEncoding *string `json:"httpBodyEncoding,omitempty"`
+	// A pointer to an empty map is sent as {} (removes every header); nil
+	// leaves the stored headers untouched.
+	HTTPHeaders *map[string]string `json:"httpHeaders,omitempty"`
+	IgnoreTLS   *bool              `json:"ignoreTls,omitempty"`
+
+	Retries           *int64   `json:"retries,omitempty"`
+	Severity3xx       *string  `json:"severity3xx,omitempty"`
+	KeywordInvert     *bool    `json:"keywordInvert,omitempty"`
+	JSONPath          *string  `json:"jsonPath,omitempty"`
+	JSONOperator      *string  `json:"jsonOperator,omitempty"`
+	JSONExpectedValue *string  `json:"jsonExpectedValue,omitempty"`
+	DNSServer         *string  `json:"dnsServer,omitempty"`
+	DBQuery           *string  `json:"dbQuery,omitempty"`
+	ChildMonitorIDs   []string `json:"childMonitorIds,omitempty"`
+	// Credentials: a value replaces the stored one; removing one is an
+	// explicit null (see Null).
+	BasicAuthUser *string           `json:"basicAuthUser,omitempty"`
+	BasicAuthPass *string           `json:"basicAuthPass,omitempty"`
+	AuthConfig    map[string]string `json:"authConfig,omitempty"`
+	// Null lists JSON field names to send as an explicit null — how the API
+	// removes a keyword or a DNS expectation ("omitted" means "unchanged").
+	Null []string `json:"-"`
+}
+
+// MarshalJSON adds the explicit nulls named in Null to the regular encoding.
+func (in MonitorUpdateInput) MarshalJSON() ([]byte, error) {
+	type plain MonitorUpdateInput
+	b, err := json.Marshal(plain(in))
+	if err != nil || len(in.Null) == 0 {
+		return b, err
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(b, &fields); err != nil {
+		return nil, err
+	}
+	for _, name := range in.Null {
+		fields[name] = nil
+	}
+	return json.Marshal(fields)
 }
 
 func (c *Client) CreateMonitor(ctx context.Context, in MonitorCreateInput) (*Monitor, error) {
@@ -237,6 +345,158 @@ func (c *Client) ListMonitors(ctx context.Context) ([]Monitor, error) {
 		}
 	}
 	return all, nil
+}
+
+// ─── Alert channels of a monitor ────────────────────────────────
+
+type monitorAlertChannelsEnvelope struct {
+	Data struct {
+		ChannelIDs []string `json:"channelIds"`
+	} `json:"data"`
+}
+
+func (c *Client) GetMonitorAlertChannels(ctx context.Context, monitorID string) ([]string, error) {
+	var env monitorAlertChannelsEnvelope
+	if err := c.do(ctx, http.MethodGet, "/monitors/"+monitorID+"/alert-channels", nil, &env); err != nil {
+		return nil, err
+	}
+	return env.Data.ChannelIDs, nil
+}
+
+// SetMonitorAlertChannels replaces the monitor's set of attached channels;
+// an empty list detaches them all. An id that is not one of the
+// organization's channels is refused (404) before anything is changed.
+func (c *Client) SetMonitorAlertChannels(ctx context.Context, monitorID string, channelIDs []string) ([]string, error) {
+	if channelIDs == nil {
+		channelIDs = []string{}
+	}
+	body := struct {
+		ChannelIDs []string `json:"channelIds"`
+	}{channelIDs}
+	var env monitorAlertChannelsEnvelope
+	if err := c.do(ctx, http.MethodPut, "/monitors/"+monitorID+"/alert-channels", body, &env); err != nil {
+		return nil, err
+	}
+	return env.Data.ChannelIDs, nil
+}
+
+// ─── Monitor groups ─────────────────────────────────────────────
+
+type MonitorGroup struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Description     *string  `json:"description"`
+	Color           *string  `json:"color"`
+	Tags            []string `json:"tags"`
+	AlertChannelIDs []string `json:"alertChannelIds"`
+	MonitorIDs      []string `json:"monitorIds"`
+	Paused          bool     `json:"paused"`
+	Muted           bool     `json:"muted"`
+}
+
+type monitorGroupEnvelope struct {
+	Data MonitorGroup `json:"data"`
+}
+
+type MonitorGroupCreateInput struct {
+	Name            string   `json:"name"`
+	Description     string   `json:"description,omitempty"`
+	Color           *string  `json:"color,omitempty"`
+	Tags            []string `json:"tags,omitempty"`
+	AlertChannelIDs []string `json:"alertChannelIds,omitempty"`
+	MonitorIDs      []string `json:"monitorIds,omitempty"`
+}
+
+// MonitorGroupUpdateInput always sends the descriptive fields (the resource
+// owns them): Description "" and Color nil clear the stored value. MonitorIDs
+// is only sent when non-nil, since replacing the membership is a separate
+// write server-side.
+type MonitorGroupUpdateInput struct {
+	Name            string    `json:"name"`
+	Description     string    `json:"description"`
+	Color           *string   `json:"color"`
+	Tags            []string  `json:"tags"`
+	AlertChannelIDs []string  `json:"alertChannelIds"`
+	MonitorIDs      *[]string `json:"monitorIds,omitempty"`
+}
+
+func (c *Client) ListMonitorGroups(ctx context.Context) ([]MonitorGroup, error) {
+	var env struct {
+		Data []MonitorGroup `json:"data"`
+	}
+	if err := c.do(ctx, http.MethodGet, "/monitor-groups", nil, &env); err != nil {
+		return nil, err
+	}
+	return env.Data, nil
+}
+
+func (c *Client) CreateMonitorGroup(ctx context.Context, in MonitorGroupCreateInput) (*MonitorGroup, error) {
+	var env monitorGroupEnvelope
+	if err := c.do(ctx, http.MethodPost, "/monitor-groups", in, &env); err != nil {
+		return nil, err
+	}
+	return &env.Data, nil
+}
+
+func (c *Client) GetMonitorGroup(ctx context.Context, id string) (*MonitorGroup, error) {
+	var env monitorGroupEnvelope
+	if err := c.do(ctx, http.MethodGet, "/monitor-groups/"+id, nil, &env); err != nil {
+		return nil, err
+	}
+	return &env.Data, nil
+}
+
+func (c *Client) UpdateMonitorGroup(ctx context.Context, id string, in MonitorGroupUpdateInput) (*MonitorGroup, error) {
+	if in.Tags == nil {
+		in.Tags = []string{}
+	}
+	if in.AlertChannelIDs == nil {
+		in.AlertChannelIDs = []string{}
+	}
+	var env monitorGroupEnvelope
+	if err := c.do(ctx, http.MethodPatch, "/monitor-groups/"+id, in, &env); err != nil {
+		return nil, err
+	}
+	return &env.Data, nil
+}
+
+// DeleteMonitorGroup removes the group only: its monitors are kept, ungrouped.
+func (c *Client) DeleteMonitorGroup(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodDelete, "/monitor-groups/"+id, nil, nil)
+}
+
+// ─── Private agents (read-only) ─────────────────────────────────
+
+type PrivateAgent struct {
+	ID   string  `json:"id"`
+	Name string  `json:"name"`
+	Site *string `json:"site"`
+	// Region is the value to put in a monitor's regions to run it on this
+	// agent ("private:<id>").
+	Region          string  `json:"region"`
+	Status          string  `json:"status"`
+	Suspended       bool    `json:"suspended"`
+	Version         *string `json:"version"`
+	Hostname        *string `json:"hostname"`
+	Platform        *string `json:"platform"`
+	LastHeartbeatAt *string `json:"lastHeartbeatAt"`
+}
+
+type PrivateAgentList struct {
+	Agents []PrivateAgent `json:"data"`
+	Meta   struct {
+		Eligible      bool    `json:"eligible"`
+		Limit         int64   `json:"limit"`
+		LatestVersion *string `json:"latestVersion"`
+	} `json:"meta"`
+}
+
+func (c *Client) ListPrivateAgents(ctx context.Context) (*PrivateAgentList, error) {
+	var out PrivateAgentList
+	if err := c.do(ctx, http.MethodGet, "/private-agents", nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // ─── Incidents ──────────────────────────────────────────────────

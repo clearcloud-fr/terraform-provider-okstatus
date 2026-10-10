@@ -1,7 +1,7 @@
 # terraform-provider-okstatus
 
-A Terraform provider for [OKStatus](https://okstatus.eu) — manage monitors, incidents, status
-pages, alert channels and maintenance windows as code, against OKStatus's public API
+A Terraform provider for [OKStatus](https://okstatus.eu) — manage monitors, monitor groups,
+incidents, status pages, alert channels and maintenance windows as code, against OKStatus's public API
 (`api-v1`, Max plan required for an API key).
 
 > **Naming note**: the repo/binary is `terraform-provider-okstatus`, matching Terraform's
@@ -29,8 +29,9 @@ this against production infrastructure.
 
 | Resource | Maps to |
 |---|---|
-| `okstatus_monitor` | `/monitors` |
+| `okstatus_monitor` | every check type but `llm` — `/monitors`, and `/monitors/:id/alert-channels` when `alert_channel_ids` is set |
 | `okstatus_llm_monitor` | `/monitors` (type `llm`) — LLM canary checks: prompt + TTFT/content assertions, single region |
+| `okstatus_monitor_group` | `/monitor-groups` — folders of the Monitors page, with their monitors |
 | `okstatus_incident` | `/incidents` (see note below — no plain field PATCH) |
 | `okstatus_status_page` | `/status-pages` |
 | `okstatus_alert_channel` | `/alert-channels` |
@@ -43,6 +44,43 @@ this against production infrastructure.
 | `okstatus_org` | `/org` (read-only) |
 | `okstatus_monitors` | `/monitors` — every monitor in the org, plus `total`; pages through the API internally |
 | `okstatus_alert_channels` | `/alert-channels` — every alert channel in the org, plus `total` |
+| `okstatus_monitor_groups` | `/monitor-groups` — every group with the ids of its monitors |
+| `okstatus_private_agents` | `/private-agents` (read-only) — each agent with the `region` value that runs a monitor on it |
+
+## Monitor settings added in v1.6
+
+`okstatus_monitor` gained `tags`, `paused`, `muted`, `keyword`, `follow_redirects`, `port`,
+`dns_record_type`, `dns_expected_value`, the HTTP request options (`http_method`,
+`http_headers`, `http_body`, `http_body_encoding`, `ignore_tls`) and `alert_channel_ids` — the settings the dashboard
+and the MCP connector already had. Two rules worth knowing:
+
+- **Left out means untouched.** None of them has a default: an attribute absent from the
+  configuration keeps whatever the monitor has. Upgrading from v1.5 therefore plans no change,
+  even on monitors tagged, paused or given a keyword in the dashboard. To remove a value, say
+  so: `tags = []`, `keyword = ""`, `paused = false`.
+- **`alert_channel_ids` is all or nothing.** Set, it is the complete list of the monitor's
+  channels. Absent, Terraform does not look at the monitor's channels at all. A monitor that
+  joins an `okstatus_monitor_group` receives the group's channels: repeat them on the monitor
+  if you manage both.
+
+- **Credentials are write-only.** `http_headers`, `basic_auth_user` / `basic_auth_password`
+  and the `auth` block (bearer, API key, cookie, OAuth2, mTLS) are never returned by the API,
+  so the state holds what Terraform last sent: an edit made in the dashboard is not seen as
+  drift, and they are sent again only when they change. Removing one from the configuration
+  removes it from the monitor. Secrets are marked sensitive. Never put `user:password@` in
+  `url` (refused at `plan`): the API stores credentials apart from the target.
+
+`type` now covers every check type but `llm` (which keeps its own resource): `grpc`, `push`,
+`group`, `postgres`, `mysql`, `mongodb`, `smtp`, `imap`, `redis`, with their settings
+(`db_query`, `grace_period` and the computed `push_token`, `child_monitor_ids`), plus
+`retries`, `severity_3xx`, `keyword_invert`, the JSON assertion and `dns_server`. Changing
+`type` or `grace_period` replaces the monitor.
+
+`regions` also accepts `private:<agent id>` (one private agent), which
+`data.okstatus_private_agents` provides as `region`.
+
+This needs the OKStatus API that ships these fields (October 2026): against an older API the
+new attributes are silently ignored by the server and `apply` reports an inconsistent result.
 
 ## Provider configuration
 
@@ -137,6 +175,8 @@ terraform plan   # no `terraform init` needed/possible with dev_overrides active
 
 - `okstatus_status_page_groups` (nested groups/monitors under a status page — `PUT
   /status-pages/:id/groups` isn't exposed by `api-v1` yet, see the OpenAPI roadmap).
+- Enrolling a private agent (it hands out a credential; done in the dashboard) and
+  pausing or muting a whole group.
 - Alert channel `type`-specific config validation (the provider accepts any string map for
   `config`; `ok-status-backend` validates the actual per-type shape and will reject a bad one
   at apply time with a clear error).
