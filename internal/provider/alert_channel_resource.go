@@ -65,7 +65,8 @@ func (r *AlertChannelResource) Schema(ctx context.Context, req resource.SchemaRe
 			"config": schema.MapAttribute{
 				Required:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: "Channel configuration, string key/value pairs (e.g. `webhookUrl`, `email`) — see the resource description above for the exact keys per `type`. Changing it replaces the resource — api-v1 has no PATCH for config, only for `enabled`.",
+				Sensitive:           true,
+				MarkdownDescription: "Channel configuration, string key/value pairs (e.g. `webhookUrl`, `email`) — see the resource description above for the exact keys per `type`. Sensitive: it holds webhook URLs and tokens. OKStatus returns those masked, so the state keeps what the configuration says and an edit made in the dashboard is not detected. Changing it replaces the resource — api-v1 has no PATCH for config, only for `enabled`.",
 				PlanModifiers:       []planmodifier.Map{mapplanmodifier.RequiresReplace()},
 			},
 			"enabled": schema.BoolAttribute{
@@ -93,7 +94,7 @@ func (r *AlertChannelResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	in := client.AlertChannelCreateInput{Type: data.Type.ValueString(), Config: config}
+	in := client.AlertChannelCreateInput{Type: data.Type.ValueString(), Config: client.ChannelConfigValues(config)}
 	if !data.Enabled.IsNull() && !data.Enabled.IsUnknown() {
 		v := data.Enabled.ValueBool()
 		in.Enabled = &v
@@ -169,7 +170,15 @@ func writeAlertChannel(ctx context.Context, data *alertChannelResourceModel, ch 
 	data.ID = types.StringValue(ch.ID)
 	data.Type = types.StringValue(ch.Type)
 	data.Enabled = types.BoolValue(ch.Enabled)
-	m, diags := types.MapValueFrom(ctx, types.StringType, ch.Config)
+	// The API masks the secrets of a channel (webhook URL, token): written
+	// back into the state, the masked value differed from the configuration
+	// on every plan and, `config` forcing replacement, each apply destroyed
+	// and recreated the channel. The state keeps the configured value; only
+	// an imported channel, which has none yet, takes what the API returns.
+	if !data.Config.IsNull() && !data.Config.IsUnknown() {
+		return nil
+	}
+	m, diags := types.MapValueFrom(ctx, types.StringType, ch.ConfigStrings())
 	data.Config = m
 	return diags
 }

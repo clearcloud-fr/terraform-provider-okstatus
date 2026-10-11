@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -22,6 +23,43 @@ type Client struct {
 	endpoint   string
 	apiKey     string
 	httpClient *http.Client
+	// sleep waits between attempts; replaced in tests.
+	sleep func(context.Context, time.Duration) error
+}
+
+// A refresh reads every resource, and the API allows a limited number of
+// requests per minute: with a few dozen monitors a plain `terraform plan`
+// runs into 429. The client waits and retries instead of failing the run.
+const (
+	maxAttempts  = 8
+	maxRetryWait = 65 * time.Second
+)
+
+func sleepContext(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
+}
+
+// retryWait says how long to wait before retrying a response, or false when
+// the response is final. Retried: 429, and the 502/503 "UNAVAILABLE" that
+// APIs older than 2026-10-11 answered in place of a 429.
+func retryWait(status int, code string, retryAfter string, attempt int) (time.Duration, bool) {
+	throttled := status == http.StatusTooManyRequests
+	unavailable := (status == http.StatusBadGateway || status == http.StatusServiceUnavailable) && code == "UNAVAILABLE"
+	if !throttled && !unavailable {
+		return 0, false
+	}
+	if secs, err := strconv.Atoi(strings.TrimSpace(retryAfter)); err == nil && secs > 0 {
+		return min(time.Duration(secs)*time.Second, maxRetryWait), true
+	}
+	// 2s, 4s, 8s, 16s, 32s, then capped.
+	return min(time.Duration(2<<uint(attempt))*time.Second, maxRetryWait), true
 }
 
 func New(endpoint, apiKey string) *Client {
@@ -35,6 +73,7 @@ func New(endpoint, apiKey string) *Client {
 		endpoint:   endpoint,
 		apiKey:     apiKey,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
+		sleep:      sleepContext,
 	}
 }
 
@@ -44,6 +83,8 @@ type APIError struct {
 	StatusCode int
 	Code       string
 	Message    string
+	// RetryAfter is the response's Retry-After header (seconds), if any.
+	RetryAfter string
 }
 
 func (e *APIError) Error() string {
@@ -63,13 +104,38 @@ type errorEnvelope struct {
 // do sends a request and decodes a successful (< 400) JSON response into out.
 // out may be nil for responses with no body worth decoding (e.g. delete).
 func (c *Client) do(ctx context.Context, method, path string, body any, out any) error {
-	var reqBody io.Reader
+	var encoded []byte
 	if body != nil {
 		b, err := json.Marshal(body)
 		if err != nil {
 			return fmt.Errorf("encoding request body: %w", err)
 		}
-		reqBody = bytes.NewReader(b)
+		encoded = b
+	}
+
+	for attempt := 0; ; attempt++ {
+		err := c.doOnce(ctx, method, path, encoded, out)
+		apiErr, isAPIErr := err.(*APIError)
+		if !isAPIErr || attempt+1 >= maxAttempts {
+			return err
+		}
+		wait, retry := retryWait(apiErr.StatusCode, apiErr.Code, apiErr.RetryAfter, attempt)
+		if !retry {
+			return err
+		}
+		if sleepErr := c.sleep(ctx, wait); sleepErr != nil {
+			return err
+		}
+	}
+}
+
+// doOnce sends one request. A throttled request was refused before reaching
+// any handler, so sending it again is safe for every method.
+func (c *Client) doOnce(ctx context.Context, method, path string, encoded []byte, out any) error {
+	var reqBody io.Reader
+	body := encoded
+	if body != nil {
+		reqBody = bytes.NewReader(body)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, c.endpoint+path, reqBody)
@@ -93,7 +159,7 @@ func (c *Client) do(ctx context.Context, method, path string, body any, out any)
 	}
 
 	if resp.StatusCode >= 400 {
-		apiErr := &APIError{StatusCode: resp.StatusCode}
+		apiErr := &APIError{StatusCode: resp.StatusCode, RetryAfter: resp.Header.Get("Retry-After")}
 		var env errorEnvelope
 		if json.Unmarshal(respBody, &env) == nil {
 			apiErr.Code = env.Error.Code
@@ -635,16 +701,56 @@ func (c *Client) DeleteStatusPage(ctx context.Context, id string) error {
 // ─── Alert Channels ─────────────────────────────────────────────
 
 type AlertChannel struct {
-	ID      string            `json:"id"`
-	Type    string            `json:"type"`
-	Config  map[string]string `json:"config"`
-	Enabled bool              `json:"enabled"`
+	ID   string  `json:"id"`
+	Type string  `json:"type"`
+	Name *string `json:"name"`
+	// Config values are not all strings (a Jira channel carries the boolean
+	// `autoResolve`): decoding them as map[string]string made the whole
+	// list — and so every channel's Read — fail. Secrets come back masked.
+	Config  map[string]any `json:"config"`
+	Enabled bool           `json:"enabled"`
+}
+
+// ConfigStrings is Config with every value as the string Terraform holds
+// ("true" for a boolean, the plain number for a number).
+func (ch AlertChannel) ConfigStrings() map[string]string {
+	out := make(map[string]string, len(ch.Config))
+	for k, v := range ch.Config {
+		switch t := v.(type) {
+		case string:
+			out[k] = t
+		case nil:
+			// absent
+		default:
+			b, _ := json.Marshal(t)
+			out[k] = string(b)
+		}
+	}
+	return out
 }
 
 type AlertChannelCreateInput struct {
-	Type    string            `json:"type"`
-	Config  map[string]string `json:"config"`
-	Enabled *bool             `json:"enabled,omitempty"`
+	Type    string         `json:"type"`
+	Config  map[string]any `json:"config"`
+	Enabled *bool          `json:"enabled,omitempty"`
+}
+
+// ChannelConfigValues turns Terraform's string map into the API's config:
+// "true" / "false" become booleans, which is what the API expects for the
+// few boolean settings; everything else stays a string.
+func ChannelConfigValues(config map[string]string) map[string]any {
+	out := make(map[string]any, len(config))
+	for k, v := range config {
+		switch v {
+		case "true":
+			out[k] = true
+		case "false":
+			out[k] = false
+		default:
+			out[k] = v
+		}
+	}
+	return out
 }
 
 type AlertChannelUpdateInput struct {

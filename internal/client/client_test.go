@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // Revue sécurité 2026-09-16 — le provider n'avait aucun test. Ces tests
@@ -361,5 +362,134 @@ func TestListPrivateAgents(t *testing.T) {
 	}
 	if !list.Meta.Eligible || list.Meta.Limit != 10 || list.Meta.LatestVersion == nil {
 		t.Fatalf("meta: %+v", list.Meta)
+	}
+}
+
+// v1.6.1 — trouvé au premier essai réel : un canal Jira porte un booléen
+// (`autoResolve`) dans sa config. Décodée en map[string]string, la liste
+// entière échouait, et avec elle la lecture de tous les canaux.
+func TestListAlertChannelsAcceptsNonStringConfigValues(t *testing.T) {
+	rs := newServer(t, http.StatusOK, `{"channels":[
+		{"id":"ch-1","type":"jira","name":"Ops","enabled":true,"config":{"baseUrl":"https://x","autoResolve":true,"retries":3,"note":null}},
+		{"id":"ch-2","type":"email","name":null,"enabled":false,"config":{"email":"a@b.c"}}]}`)
+	c := New(rs.srv.URL, "k")
+
+	channels, err := c.ListAlertChannels(context.Background())
+	if err != nil {
+		t.Fatalf("ListAlertChannels: %v", err)
+	}
+	if len(channels) != 2 || channels[0].Name == nil || *channels[0].Name != "Ops" || channels[1].Name != nil {
+		t.Fatalf("canaux: %+v", channels)
+	}
+	got := channels[0].ConfigStrings()
+	if got["autoResolve"] != "true" || got["retries"] != "3" || got["baseUrl"] != "https://x" {
+		t.Fatalf("config en chaînes: %v", got)
+	}
+	if _, present := got["note"]; present {
+		t.Fatalf("une valeur nulle ne doit pas apparaître: %v", got)
+	}
+}
+
+func TestChannelConfigValuesSendsBooleansAsBooleans(t *testing.T) {
+	got := ChannelConfigValues(map[string]string{"autoResolve": "true", "quiet": "false", "webhookUrl": "https://x"})
+	if got["autoResolve"] != true || got["quiet"] != false || got["webhookUrl"] != "https://x" {
+		t.Fatalf("conversion: %v", got)
+	}
+}
+
+// v1.6.1 — trouvé à l'import réel de 59 moniteurs : l'API limite le nombre de
+// requêtes par minute, et un `terraform plan` qui relit tout finissait en
+// erreurs 429 (ou 502 « UNAVAILABLE » sur l'API d'avant le 11/10). Le client
+// attend et réessaie.
+func sequenceServer(t *testing.T, responses ...func(http.ResponseWriter)) (*httptest.Server, *int) {
+	t.Helper()
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		i := calls
+		calls++
+		if i >= len(responses) {
+			i = len(responses) - 1
+		}
+		responses[i](w)
+	}))
+	t.Cleanup(srv.Close)
+	return srv, &calls
+}
+
+func respond(status int, header, body string) func(http.ResponseWriter) {
+	return func(w http.ResponseWriter) {
+		if header != "" {
+			w.Header().Set("Retry-After", header)
+		}
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, body)
+	}
+}
+
+func TestClientRetriesWhenThrottled(t *testing.T) {
+	srv, calls := sequenceServer(t,
+		respond(http.StatusTooManyRequests, "7", `{"error":{"code":"RATE_LIMITED","message":"slow down"}}`),
+		respond(http.StatusBadGateway, "", `{"error":{"code":"UNAVAILABLE","message":"ok-status-backend unreachable"}}`),
+		respond(http.StatusOK, "", `{"data":{"id":"mon-1"}}`),
+	)
+	c := New(srv.URL, "k")
+	var waits []time.Duration
+	c.sleep = func(_ context.Context, d time.Duration) error { waits = append(waits, d); return nil }
+
+	m, err := c.GetMonitor(context.Background(), "mon-1")
+	if err != nil || m.ID != "mon-1" {
+		t.Fatalf("GetMonitor après deux refus: %v %+v", err, m)
+	}
+	if *calls != 3 {
+		t.Fatalf("3 appels attendus, %d faits", *calls)
+	}
+	// Retry-After respecté pour le premier, repli progressif pour le second.
+	if len(waits) != 2 || waits[0] != 7*time.Second || waits[1] != 4*time.Second {
+		t.Fatalf("attentes: %v", waits)
+	}
+}
+
+func TestClientDoesNotRetryRealErrors(t *testing.T) {
+	for _, status := range []int{http.StatusBadRequest, http.StatusNotFound, http.StatusInternalServerError, http.StatusBadGateway} {
+		srv, calls := sequenceServer(t, respond(status, "", `{"error":{"code":"UPSTREAM_ERROR","message":"x"}}`))
+		c := New(srv.URL, "k")
+		c.sleep = func(context.Context, time.Duration) error {
+			t.Fatalf("aucune attente attendue pour %d", status)
+			return nil
+		}
+		if _, err := c.GetMonitor(context.Background(), "mon-1"); err == nil {
+			t.Fatalf("erreur attendue pour %d", status)
+		}
+		if *calls != 1 {
+			t.Fatalf("%d: un seul appel attendu, %d faits", status, *calls)
+		}
+	}
+}
+
+func TestClientGivesUpAfterMaxAttempts(t *testing.T) {
+	srv, calls := sequenceServer(t, respond(http.StatusTooManyRequests, "", `{"error":{"code":"RATE_LIMITED","message":"slow down"}}`))
+	c := New(srv.URL, "k")
+	c.sleep = func(context.Context, time.Duration) error { return nil }
+
+	_, err := c.GetMonitor(context.Background(), "mon-1")
+	apiErr, ok := err.(*APIError)
+	if !ok || apiErr.StatusCode != http.StatusTooManyRequests {
+		t.Fatalf("le 429 final doit remonter tel quel: %v", err)
+	}
+	if *calls != maxAttempts {
+		t.Fatalf("%d appels attendus, %d faits", maxAttempts, *calls)
+	}
+}
+
+func TestClientStopsWaitingWhenCancelled(t *testing.T) {
+	srv, calls := sequenceServer(t, respond(http.StatusTooManyRequests, "60", `{}`))
+	c := New(srv.URL, "k")
+	c.sleep = func(context.Context, time.Duration) error { return context.Canceled }
+
+	if _, err := c.GetMonitor(context.Background(), "mon-1"); err == nil {
+		t.Fatal("erreur attendue")
+	}
+	if *calls != 1 {
+		t.Fatalf("pas de nouvel appel après annulation, %d faits", *calls)
 	}
 }

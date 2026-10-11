@@ -23,6 +23,7 @@ type AlertChannelsDataSource struct {
 type alertChannelListItemModel struct {
 	ID      types.String `tfsdk:"id"`
 	Type    types.String `tfsdk:"type"`
+	Name    types.String `tfsdk:"name"`
 	Enabled types.Bool   `tfsdk:"enabled"`
 }
 
@@ -58,6 +59,7 @@ func (d *AlertChannelsDataSource) Schema(ctx context.Context, req datasource.Sch
 					Attributes: map[string]schema.Attribute{
 						"id":      schema.StringAttribute{Computed: true},
 						"type":    schema.StringAttribute{Computed: true},
+						"name":    schema.StringAttribute{Computed: true, MarkdownDescription: "The channel's name in the dashboard — the way to tell two channels of the same type apart."},
 						"enabled": schema.BoolAttribute{Computed: true},
 					},
 				},
@@ -82,6 +84,7 @@ func (d *AlertChannelsDataSource) Read(ctx context.Context, req datasource.ReadR
 		items = append(items, alertChannelListItemModel{
 			ID:      types.StringValue(ch.ID),
 			Type:    types.StringValue(ch.Type),
+			Name:    nullableString(ch.Name),
 			Enabled: types.BoolValue(ch.Enabled),
 		})
 	}
