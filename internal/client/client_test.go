@@ -267,6 +267,32 @@ func TestGetMonitorDecodesSharedSettings(t *testing.T) {
 	}
 }
 
+func TestMonitorLatencyAlertRoundTrip(t *testing.T) {
+	rs := newServer(t, http.StatusOK, `{"data":{"id":"mon-1","latencyThresholdMs":1500,"latencyPublic":false,"latencyAnomaly":true}}`)
+	c := New(rs.srv.URL, "k")
+
+	m, err := c.GetMonitor(context.Background(), "mon-1")
+	if err != nil {
+		t.Fatalf("GetMonitor: %v", err)
+	}
+	if m.LatencyThresholdMs == nil || *m.LatencyThresholdMs != 1500 || m.LatencyPublic == nil || *m.LatencyPublic ||
+		m.LatencyAnomaly == nil || !*m.LatencyAnomaly {
+		t.Fatalf("latence: %+v", m)
+	}
+
+	// Retirer le seuil = null explicite ; latencyPublic part tel quel.
+	public := true
+	if _, err := c.UpdateMonitor(context.Background(), "mon-1", MonitorUpdateInput{
+		LatencyPublic: &public,
+		Null:          []string{"latencyThresholdMs"},
+	}); err != nil {
+		t.Fatalf("UpdateMonitor: %v", err)
+	}
+	if string(rs.gotBody) != `{"latencyPublic":true,"latencyThresholdMs":null}` {
+		t.Fatalf("corps inattendu: %s", rs.gotBody)
+	}
+}
+
 func TestSetMonitorAlertChannelsSendsEmptyListNotNull(t *testing.T) {
 	rs := newServer(t, http.StatusOK, `{"data":{"channelIds":[]}}`)
 	c := New(rs.srv.URL, "k")

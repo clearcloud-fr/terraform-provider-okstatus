@@ -214,17 +214,21 @@ type Monitor struct {
 	IgnoreTLS        *bool   `json:"ignoreTls"`
 	// Assertions and per-type settings. basicAuthUser/Pass and authConfig
 	// are absent for the same reason as httpHeaders: they come back masked.
-	Retries           *int64   `json:"retries"`
-	Severity3xx       *string  `json:"severity3xx"`
-	KeywordInvert     *bool    `json:"keywordInvert"`
-	JSONPath          *string  `json:"jsonPath"`
-	JSONOperator      *string  `json:"jsonOperator"`
-	JSONExpectedValue *string  `json:"jsonExpectedValue"`
-	DNSServer         *string  `json:"dnsServer"`
-	DBQuery           *string  `json:"dbQuery"`
-	GracePeriod       *int64   `json:"gracePeriod"`
-	ChildMonitorIDs   []string `json:"childMonitorIds"`
-	PushToken         *string  `json:"pushToken"`
+	Retries     *int64  `json:"retries"`
+	Severity3xx *string `json:"severity3xx"`
+	// Response time alert: nil threshold = off.
+	LatencyThresholdMs *int64   `json:"latencyThresholdMs"`
+	LatencyPublic      *bool    `json:"latencyPublic"`
+	LatencyAnomaly     *bool    `json:"latencyAnomaly"`
+	KeywordInvert      *bool    `json:"keywordInvert"`
+	JSONPath           *string  `json:"jsonPath"`
+	JSONOperator       *string  `json:"jsonOperator"`
+	JSONExpectedValue  *string  `json:"jsonExpectedValue"`
+	DNSServer          *string  `json:"dnsServer"`
+	DBQuery            *string  `json:"dbQuery"`
+	GracePeriod        *int64   `json:"gracePeriod"`
+	ChildMonitorIDs    []string `json:"childMonitorIds"`
+	PushToken          *string  `json:"pushToken"`
 }
 
 // ─── LLM monitors (OKS-266) ────────────────────────────────────
@@ -279,18 +283,21 @@ type MonitorCreateInput struct {
 	HTTPHeaders map[string]string `json:"httpHeaders,omitempty"`
 	IgnoreTLS   *bool             `json:"ignoreTls,omitempty"`
 
-	Retries           *int64   `json:"retries,omitempty"`
-	Severity3xx       string   `json:"severity3xx,omitempty"`
-	KeywordInvert     *bool    `json:"keywordInvert,omitempty"`
-	JSONPath          string   `json:"jsonPath,omitempty"`
-	JSONOperator      string   `json:"jsonOperator,omitempty"`
-	JSONExpectedValue string   `json:"jsonExpectedValue,omitempty"`
-	DNSServer         string   `json:"dnsServer,omitempty"`
-	DBQuery           string   `json:"dbQuery,omitempty"`
-	GracePeriod       *int64   `json:"gracePeriod,omitempty"`
-	ChildMonitorIDs   []string `json:"childMonitorIds,omitempty"`
-	BasicAuthUser     string   `json:"basicAuthUser,omitempty"`
-	BasicAuthPass     string   `json:"basicAuthPass,omitempty"`
+	Retries            *int64   `json:"retries,omitempty"`
+	Severity3xx        string   `json:"severity3xx,omitempty"`
+	LatencyThresholdMs *int64   `json:"latencyThresholdMs,omitempty"`
+	LatencyPublic      *bool    `json:"latencyPublic,omitempty"`
+	LatencyAnomaly     *bool    `json:"latencyAnomaly,omitempty"`
+	KeywordInvert      *bool    `json:"keywordInvert,omitempty"`
+	JSONPath           string   `json:"jsonPath,omitempty"`
+	JSONOperator       string   `json:"jsonOperator,omitempty"`
+	JSONExpectedValue  string   `json:"jsonExpectedValue,omitempty"`
+	DNSServer          string   `json:"dnsServer,omitempty"`
+	DBQuery            string   `json:"dbQuery,omitempty"`
+	GracePeriod        *int64   `json:"gracePeriod,omitempty"`
+	ChildMonitorIDs    []string `json:"childMonitorIds,omitempty"`
+	BasicAuthUser      string   `json:"basicAuthUser,omitempty"`
+	BasicAuthPass      string   `json:"basicAuthPass,omitempty"`
 	// AuthConfig uses the API's own field names (type, token, tokenUrl, …).
 	AuthConfig map[string]string `json:"authConfig,omitempty"`
 }
@@ -323,15 +330,19 @@ type MonitorUpdateInput struct {
 	HTTPHeaders *map[string]string `json:"httpHeaders,omitempty"`
 	IgnoreTLS   *bool              `json:"ignoreTls,omitempty"`
 
-	Retries           *int64   `json:"retries,omitempty"`
-	Severity3xx       *string  `json:"severity3xx,omitempty"`
-	KeywordInvert     *bool    `json:"keywordInvert,omitempty"`
-	JSONPath          *string  `json:"jsonPath,omitempty"`
-	JSONOperator      *string  `json:"jsonOperator,omitempty"`
-	JSONExpectedValue *string  `json:"jsonExpectedValue,omitempty"`
-	DNSServer         *string  `json:"dnsServer,omitempty"`
-	DBQuery           *string  `json:"dbQuery,omitempty"`
-	ChildMonitorIDs   []string `json:"childMonitorIds,omitempty"`
+	Retries     *int64  `json:"retries,omitempty"`
+	Severity3xx *string `json:"severity3xx,omitempty"`
+	// Removing the threshold is an explicit null (see Null).
+	LatencyThresholdMs *int64   `json:"latencyThresholdMs,omitempty"`
+	LatencyPublic      *bool    `json:"latencyPublic,omitempty"`
+	LatencyAnomaly     *bool    `json:"latencyAnomaly,omitempty"`
+	KeywordInvert      *bool    `json:"keywordInvert,omitempty"`
+	JSONPath           *string  `json:"jsonPath,omitempty"`
+	JSONOperator       *string  `json:"jsonOperator,omitempty"`
+	JSONExpectedValue  *string  `json:"jsonExpectedValue,omitempty"`
+	DNSServer          *string  `json:"dnsServer,omitempty"`
+	DBQuery            *string  `json:"dbQuery,omitempty"`
+	ChildMonitorIDs    []string `json:"childMonitorIds,omitempty"`
 	// Credentials: a value replaces the stored one; removing one is an
 	// explicit null (see Null).
 	BasicAuthUser *string           `json:"basicAuthUser,omitempty"`

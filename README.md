@@ -76,6 +76,18 @@ and the MCP connector already had. Two rules worth knowing:
 `retries`, `severity_3xx`, `keyword_invert`, the JSON assertion and `dns_server`. Changing
 `type` or `grace_period` replaces the monitor.
 
+## Response time alerts (v1.7)
+
+`latency_threshold_ms` turns on the response time alert: the monitor turns `degraded` (never
+`down`) after `max(2, retries + 1)` slow checks in a row from one region. `latency_public = false`
+keeps that slowness off public status pages, and `latency_anomaly = true` (Max and
+Enterprise) alerts when the response time leaves its learned usual range.
+
+Unlike the v1.6 settings, `latency_threshold_ms` belongs to Terraform: left out, the alert is
+off, and a threshold set in the dashboard shows up in the next `plan` as a change to remove it.
+Copy it into the configuration first. `latency_public` and `latency_anomaly` follow the v1.6
+rule: left out, untouched.
+
 `regions` also accepts `private:<agent id>` (one private agent), which
 `data.okstatus_private_agents` provides as `region`.
 

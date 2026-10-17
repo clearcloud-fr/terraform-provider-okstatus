@@ -158,6 +158,9 @@ type monitorResourceModel struct {
 	IgnoreTLS           types.Bool   `tfsdk:"ignore_tls"`
 	Retries             types.Int64  `tfsdk:"retries"`
 	Severity3xx         types.String `tfsdk:"severity_3xx"`
+	LatencyThresholdMs  types.Int64  `tfsdk:"latency_threshold_ms"`
+	LatencyPublic       types.Bool   `tfsdk:"latency_public"`
+	LatencyAnomaly      types.Bool   `tfsdk:"latency_anomaly"`
 	KeywordInvert       types.Bool   `tfsdk:"keyword_invert"`
 	JSONPath            types.String `tfsdk:"json_path"`
 	JSONOperator        types.String `tfsdk:"json_operator"`
@@ -400,6 +403,23 @@ func (r *MonitorResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Validators:          []validator.String{stringvalidator.OneOf("degraded", "down")},
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"latency_threshold_ms": schema.Int64Attribute{
+				Optional:            true,
+				MarkdownDescription: "Response time, in milliseconds, above which the monitor turns `degraded` and alerts (50–60000). It never makes the monitor down and does not lower its uptime. Omit it to turn the alert off.",
+				Validators:          []validator.Int64{int64validator.Between(50, 60000)},
+			},
+			"latency_public": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "`false` keeps slowness off public status pages: the monitor shows as operational there while the dashboard and the alerts still report it. Defaults to `true`.",
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
+			"latency_anomaly": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "Alert when the response time moves well out of its learned usual range, region by region and by hour of the week (Max and Enterprise; 7 days of learning first). Refused at `apply` on a lower plan.",
+				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
 			"keyword_invert": schema.BoolAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -573,6 +593,9 @@ func (r *MonitorResource) Create(ctx context.Context, req resource.CreateRequest
 	}
 	in.Retries = int64PtrOrNil(data.Retries)
 	in.Severity3xx = data.Severity3xx.ValueString()
+	in.LatencyThresholdMs = int64PtrOrNil(data.LatencyThresholdMs)
+	in.LatencyPublic = boolPtrOrNil(data.LatencyPublic)
+	in.LatencyAnomaly = boolPtrOrNil(data.LatencyAnomaly)
 	in.KeywordInvert = boolPtrOrNil(data.KeywordInvert)
 	in.JSONPath = data.JSONPath.ValueString()
 	in.JSONOperator = data.JSONOperator.ValueString()
@@ -803,6 +826,19 @@ func monitorUpdateInput(ctx context.Context, data, prior monitorResourceModel) (
 	if known(data.Severity3xx) && !data.Severity3xx.Equal(prior.Severity3xx) {
 		in.Severity3xx = stringPtrVal(data.Severity3xx)
 	}
+	if !data.LatencyThresholdMs.Equal(prior.LatencyThresholdMs) {
+		if data.LatencyThresholdMs.IsNull() {
+			in.Null = append(in.Null, "latencyThresholdMs")
+		} else {
+			in.LatencyThresholdMs = int64PtrOrNil(data.LatencyThresholdMs)
+		}
+	}
+	if known(data.LatencyPublic) && !data.LatencyPublic.Equal(prior.LatencyPublic) {
+		in.LatencyPublic = boolPtrOrNil(data.LatencyPublic)
+	}
+	if known(data.LatencyAnomaly) && !data.LatencyAnomaly.Equal(prior.LatencyAnomaly) {
+		in.LatencyAnomaly = boolPtrOrNil(data.LatencyAnomaly)
+	}
 	if !data.KeywordInvert.Equal(prior.KeywordInvert) {
 		in.KeywordInvert = boolPtrOrNil(data.KeywordInvert)
 	}
@@ -957,6 +993,13 @@ func writeMonitor(ctx context.Context, data *monitorResourceModel, m *client.Mon
 	} else {
 		data.Severity3xx = types.StringValue(*m.Severity3xx)
 	}
+	if m.LatencyThresholdMs == nil {
+		data.LatencyThresholdMs = types.Int64Null()
+	} else {
+		data.LatencyThresholdMs = types.Int64Value(*m.LatencyThresholdMs)
+	}
+	data.LatencyPublic = types.BoolValue(m.LatencyPublic == nil || *m.LatencyPublic)
+	data.LatencyAnomaly = types.BoolValue(m.LatencyAnomaly != nil && *m.LatencyAnomaly)
 	data.KeywordInvert = types.BoolValue(m.KeywordInvert != nil && *m.KeywordInvert)
 	data.JSONPath = stringOrEmpty(m.JSONPath)
 	data.JSONOperator = stringOrEmpty(m.JSONOperator)

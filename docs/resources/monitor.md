@@ -133,6 +133,9 @@ resource "okstatus_monitor" "database" {
 - `json_path` (String) `http` only: path of the value to check in a JSON response (e.g. `$.status`), with `json_operator` and `json_expected_value`. Cannot be combined with `keyword`. `""` removes the assertion.
 - `keyword` (String) `http` only: text the response body must contain. `""` removes the check; left out, the current keyword is kept.
 - `keyword_invert` (Boolean) `http` only: `true` makes the monitor down when `keyword` **is** found.
+- `latency_anomaly` (Boolean) Alert when the response time moves well out of its learned usual range, region by region and by hour of the week (Max and Enterprise; 7 days of learning first). Refused at `apply` on a lower plan.
+- `latency_public` (Boolean) `false` keeps slowness off public status pages: the monitor shows as operational there while the dashboard and the alerts still report it. Defaults to `true`.
+- `latency_threshold_ms` (Number) Response time, in milliseconds, above which the monitor turns `degraded` and alerts (50–60000). It never makes the monitor down and does not lower its uptime. Omit it to turn the alert off.
 - `muted` (Boolean) `true` stops the alerts while the checks keep running. Left out, the monitor stays as it is.
 - `paused` (Boolean) `true` stops the checks, `false` resumes them. Left out, the monitor stays as it is.
 - `port` (Number) `tcp` only: port to connect to.
