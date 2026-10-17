@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/float64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -31,13 +32,14 @@ type MonitorGroupResource struct {
 }
 
 type monitorGroupResourceModel struct {
-	ID              types.String `tfsdk:"id"`
-	Name            types.String `tfsdk:"name"`
-	Description     types.String `tfsdk:"description"`
-	Color           types.String `tfsdk:"color"`
-	Tags            types.Set    `tfsdk:"tags"`
-	AlertChannelIDs types.Set    `tfsdk:"alert_channel_ids"`
-	MonitorIDs      types.Set    `tfsdk:"monitor_ids"`
+	ID              types.String  `tfsdk:"id"`
+	Name            types.String  `tfsdk:"name"`
+	Description     types.String  `tfsdk:"description"`
+	Color           types.String  `tfsdk:"color"`
+	Tags            types.Set     `tfsdk:"tags"`
+	AlertChannelIDs types.Set     `tfsdk:"alert_channel_ids"`
+	MonitorIDs      types.Set     `tfsdk:"monitor_ids"`
+	SLOTarget       types.Float64 `tfsdk:"slo_target"`
 }
 
 func (r *MonitorGroupResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -107,6 +109,14 @@ func (r *MonitorGroupResource) Schema(ctx context.Context, req resource.SchemaRe
 					"dashboard is taken out again at the next `apply`.",
 				Validators: []validator.Set{setvalidator.SizeAtMost(500)},
 			},
+			"slo_target": schema.Float64Attribute{
+				Optional: true,
+				MarkdownDescription: "Availability objective of the group in percent over 30 rolling days (e.g. `99.5`). " +
+					"The group counts as down whenever one of its monitors is; budget notices go to the " +
+					"group's `alert_channel_ids`. Max and Enterprise; refused at `apply` on a lower plan. " +
+					"Omit it for no SLO.",
+				Validators: []validator.Float64{float64validator.Between(50, 99.999)},
+			},
 		},
 	}
 }
@@ -137,6 +147,7 @@ func (r *MonitorGroupResource) Create(ctx context.Context, req resource.CreateRe
 		Tags:            setToStrings(ctx, data.Tags, &resp.Diagnostics),
 		AlertChannelIDs: setToStrings(ctx, data.AlertChannelIDs, &resp.Diagnostics),
 		MonitorIDs:      setToStrings(ctx, data.MonitorIDs, &resp.Diagnostics),
+		SLOTarget:       float64PtrOrNil(data.SLOTarget),
 	}
 	if resp.Diagnostics.HasError() {
 		return
@@ -187,6 +198,7 @@ func (r *MonitorGroupResource) Update(ctx context.Context, req resource.UpdateRe
 		Color:           stringPtrOrNil(data.Color),
 		Tags:            setToStrings(ctx, data.Tags, &resp.Diagnostics),
 		AlertChannelIDs: setToStrings(ctx, data.AlertChannelIDs, &resp.Diagnostics),
+		SLOTarget:       float64PtrOrNil(data.SLOTarget),
 	}
 	// Membership is its own write server-side, and joining a group attaches
 	// the group's channels: only send it when it actually changes.
@@ -248,6 +260,11 @@ func writeMonitorGroup(ctx context.Context, data *monitorGroupResourceModel, g *
 	data.Tags = stringSet(ctx, g.Tags, &diags)
 	data.AlertChannelIDs = stringSet(ctx, g.AlertChannelIDs, &diags)
 	data.MonitorIDs = stringSet(ctx, g.MonitorIDs, &diags)
+	if g.SLOTarget == nil {
+		data.SLOTarget = types.Float64Null()
+	} else {
+		data.SLOTarget = types.Float64Value(*g.SLOTarget)
+	}
 
 	return diags
 }

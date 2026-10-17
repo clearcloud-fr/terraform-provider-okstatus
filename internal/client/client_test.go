@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -290,6 +291,35 @@ func TestMonitorLatencyAlertRoundTrip(t *testing.T) {
 	}
 	if string(rs.gotBody) != `{"latencyPublic":true,"latencyThresholdMs":null}` {
 		t.Fatalf("corps inattendu: %s", rs.gotBody)
+	}
+}
+
+// OKS-874 — SLO : lu tel quel, retiré par un null explicite ; sur un groupe,
+// toujours envoyé (nil = null) comme les autres champs descriptifs.
+func TestSLOTargetRoundTrip(t *testing.T) {
+	rs := newServer(t, http.StatusOK, `{"data":{"id":"mon-1","sloTarget":99.9}}`)
+	c := New(rs.srv.URL, "k")
+	m, err := c.GetMonitor(context.Background(), "mon-1")
+	if err != nil {
+		t.Fatalf("GetMonitor: %v", err)
+	}
+	if m.SLOTarget == nil || *m.SLOTarget != 99.9 {
+		t.Fatalf("slo: %+v", m.SLOTarget)
+	}
+	if _, err := c.UpdateMonitor(context.Background(), "mon-1", MonitorUpdateInput{Null: []string{"sloTarget"}}); err != nil {
+		t.Fatalf("UpdateMonitor: %v", err)
+	}
+	if string(rs.gotBody) != `{"sloTarget":null}` {
+		t.Fatalf("corps inattendu: %s", rs.gotBody)
+	}
+
+	gs := newServer(t, http.StatusOK, `{"data":{"id":"g1","name":"Shop","sloTarget":null}}`)
+	gc := New(gs.srv.URL, "k")
+	if _, err := gc.UpdateMonitorGroup(context.Background(), "g1", MonitorGroupUpdateInput{Name: "Shop"}); err != nil {
+		t.Fatalf("UpdateMonitorGroup: %v", err)
+	}
+	if !strings.Contains(string(gs.gotBody), `"sloTarget":null`) {
+		t.Fatalf("le groupe doit envoyer sloTarget: %s", gs.gotBody)
 	}
 }
 

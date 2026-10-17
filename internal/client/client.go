@@ -217,18 +217,20 @@ type Monitor struct {
 	Retries     *int64  `json:"retries"`
 	Severity3xx *string `json:"severity3xx"`
 	// Response time alert: nil threshold = off.
-	LatencyThresholdMs *int64   `json:"latencyThresholdMs"`
-	LatencyPublic      *bool    `json:"latencyPublic"`
-	LatencyAnomaly     *bool    `json:"latencyAnomaly"`
-	KeywordInvert      *bool    `json:"keywordInvert"`
-	JSONPath           *string  `json:"jsonPath"`
-	JSONOperator       *string  `json:"jsonOperator"`
-	JSONExpectedValue  *string  `json:"jsonExpectedValue"`
-	DNSServer          *string  `json:"dnsServer"`
-	DBQuery            *string  `json:"dbQuery"`
-	GracePeriod        *int64   `json:"gracePeriod"`
-	ChildMonitorIDs    []string `json:"childMonitorIds"`
-	PushToken          *string  `json:"pushToken"`
+	LatencyThresholdMs *int64 `json:"latencyThresholdMs"`
+	LatencyPublic      *bool  `json:"latencyPublic"`
+	LatencyAnomaly     *bool  `json:"latencyAnomaly"`
+	// SLO objective, percent over 30 rolling days: nil = none.
+	SLOTarget         *float64 `json:"sloTarget"`
+	KeywordInvert     *bool    `json:"keywordInvert"`
+	JSONPath          *string  `json:"jsonPath"`
+	JSONOperator      *string  `json:"jsonOperator"`
+	JSONExpectedValue *string  `json:"jsonExpectedValue"`
+	DNSServer         *string  `json:"dnsServer"`
+	DBQuery           *string  `json:"dbQuery"`
+	GracePeriod       *int64   `json:"gracePeriod"`
+	ChildMonitorIDs   []string `json:"childMonitorIds"`
+	PushToken         *string  `json:"pushToken"`
 }
 
 // ─── LLM monitors (OKS-266) ────────────────────────────────────
@@ -288,6 +290,7 @@ type MonitorCreateInput struct {
 	LatencyThresholdMs *int64   `json:"latencyThresholdMs,omitempty"`
 	LatencyPublic      *bool    `json:"latencyPublic,omitempty"`
 	LatencyAnomaly     *bool    `json:"latencyAnomaly,omitempty"`
+	SLOTarget          *float64 `json:"sloTarget,omitempty"`
 	KeywordInvert      *bool    `json:"keywordInvert,omitempty"`
 	JSONPath           string   `json:"jsonPath,omitempty"`
 	JSONOperator       string   `json:"jsonOperator,omitempty"`
@@ -336,6 +339,7 @@ type MonitorUpdateInput struct {
 	LatencyThresholdMs *int64   `json:"latencyThresholdMs,omitempty"`
 	LatencyPublic      *bool    `json:"latencyPublic,omitempty"`
 	LatencyAnomaly     *bool    `json:"latencyAnomaly,omitempty"`
+	SLOTarget          *float64 `json:"sloTarget,omitempty"`
 	KeywordInvert      *bool    `json:"keywordInvert,omitempty"`
 	JSONPath           *string  `json:"jsonPath,omitempty"`
 	JSONOperator       *string  `json:"jsonOperator,omitempty"`
@@ -469,6 +473,7 @@ type MonitorGroup struct {
 	MonitorIDs      []string `json:"monitorIds"`
 	Paused          bool     `json:"paused"`
 	Muted           bool     `json:"muted"`
+	SLOTarget       *float64 `json:"sloTarget"`
 }
 
 type monitorGroupEnvelope struct {
@@ -482,6 +487,7 @@ type MonitorGroupCreateInput struct {
 	Tags            []string `json:"tags,omitempty"`
 	AlertChannelIDs []string `json:"alertChannelIds,omitempty"`
 	MonitorIDs      []string `json:"monitorIds,omitempty"`
+	SLOTarget       *float64 `json:"sloTarget,omitempty"`
 }
 
 // MonitorGroupUpdateInput always sends the descriptive fields (the resource
@@ -495,6 +501,8 @@ type MonitorGroupUpdateInput struct {
 	Tags            []string  `json:"tags"`
 	AlertChannelIDs []string  `json:"alertChannelIds"`
 	MonitorIDs      *[]string `json:"monitorIds,omitempty"`
+	// Always sent, like the descriptive fields: nil removes the SLO.
+	SLOTarget *float64 `json:"sloTarget"`
 }
 
 func (c *Client) ListMonitorGroups(ctx context.Context) ([]MonitorGroup, error) {

@@ -47,4 +47,5 @@ Read-Only:
 - `muted` (Boolean) The group was muted as a whole from the dashboard.
 - `name` (String)
 - `paused` (Boolean) The group was paused as a whole from the dashboard.
+- `slo_target` (Number) SLO objective in percent over 30 rolling days, null when the group has none.
 - `tags` (Set of String) The group's own tags.

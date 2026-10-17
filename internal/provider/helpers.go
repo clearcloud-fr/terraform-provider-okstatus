@@ -68,6 +68,14 @@ func boolPtrOrNil(b types.Bool) *bool {
 	return &v
 }
 
+func float64PtrOrNil(f types.Float64) *float64 {
+	if !known(f) {
+		return nil
+	}
+	v := f.ValueFloat64()
+	return &v
+}
+
 func int64PtrOrNil(i types.Int64) *int64 {
 	if !known(i) {
 		return nil

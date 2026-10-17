@@ -41,6 +41,7 @@ resource "okstatus_monitor_group" "payments" {
 - `color` (String) Color of the folder: a preset key of the dashboard's palette, as shown by `data.okstatus_monitor_groups` on a group colored in the dashboard (e.g. `aurora`, `green`).
 - `description` (String) Free text shown under the group's name.
 - `monitor_ids` (Set of String) The group's monitors (ids of `okstatus_monitor` or `okstatus_llm_monitor` resources). This is the complete membership: a monitor moved into the group from the dashboard is taken out again at the next `apply`.
+- `slo_target` (Number) Availability objective of the group in percent over 30 rolling days (e.g. `99.5`). The group counts as down whenever one of its monitors is; budget notices go to the group's `alert_channel_ids`. Max and Enterprise; refused at `apply` on a lower plan. Omit it for no SLO.
 - `tags` (Set of String) The group's own tags (10 at most). They are not copied onto its monitors.
 
 ### Read-Only

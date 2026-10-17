@@ -88,6 +88,15 @@ off, and a threshold set in the dashboard shows up in the next `plan` as a chang
 Copy it into the configuration first. `latency_public` and `latency_anomaly` follow the v1.6
 rule: left out, untouched.
 
+## SLOs (v1.8)
+
+`slo_target` on `okstatus_monitor` and `okstatus_monitor_group` sets an availability objective
+in percent over 30 rolling days (Max and Enterprise). The error budget, the alerts when it burns
+fast, passes 75 % or runs out, are all derived from it: there is nothing else to configure. A
+group counts as down whenever one of its monitors is. Like `latency_threshold_ms`, it belongs to
+Terraform: left out, there is no SLO. Terraform manages the objective, not the budget — read the
+budget with the API (`GET /v1/slos`) or the MCP connector (`list_slos`).
+
 `regions` also accepts `private:<agent id>` (one private agent), which
 `data.okstatus_private_agents` provides as `region`.
 

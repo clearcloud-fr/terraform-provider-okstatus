@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/float64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
@@ -136,45 +137,46 @@ type MonitorResource struct {
 }
 
 type monitorResourceModel struct {
-	ID                  types.String `tfsdk:"id"`
-	Name                types.String `tfsdk:"name"`
-	URL                 types.String `tfsdk:"url"`
-	Type                types.String `tfsdk:"type"`
-	Interval            types.Int64  `tfsdk:"interval"`
-	Regions             types.List   `tfsdk:"regions"`
-	AcceptedStatusCodes types.List   `tfsdk:"accepted_status_codes"`
-	Tags                types.Set    `tfsdk:"tags"`
-	Paused              types.Bool   `tfsdk:"paused"`
-	Muted               types.Bool   `tfsdk:"muted"`
-	Keyword             types.String `tfsdk:"keyword"`
-	FollowRedirects     types.Bool   `tfsdk:"follow_redirects"`
-	Port                types.Int64  `tfsdk:"port"`
-	DNSRecordType       types.String `tfsdk:"dns_record_type"`
-	DNSExpectedValue    types.String `tfsdk:"dns_expected_value"`
-	HTTPMethod          types.String `tfsdk:"http_method"`
-	HTTPHeaders         types.Map    `tfsdk:"http_headers"`
-	HTTPBody            types.String `tfsdk:"http_body"`
-	HTTPBodyEncoding    types.String `tfsdk:"http_body_encoding"`
-	IgnoreTLS           types.Bool   `tfsdk:"ignore_tls"`
-	Retries             types.Int64  `tfsdk:"retries"`
-	Severity3xx         types.String `tfsdk:"severity_3xx"`
-	LatencyThresholdMs  types.Int64  `tfsdk:"latency_threshold_ms"`
-	LatencyPublic       types.Bool   `tfsdk:"latency_public"`
-	LatencyAnomaly      types.Bool   `tfsdk:"latency_anomaly"`
-	KeywordInvert       types.Bool   `tfsdk:"keyword_invert"`
-	JSONPath            types.String `tfsdk:"json_path"`
-	JSONOperator        types.String `tfsdk:"json_operator"`
-	JSONExpectedValue   types.String `tfsdk:"json_expected_value"`
-	DNSServer           types.String `tfsdk:"dns_server"`
-	DBQuery             types.String `tfsdk:"db_query"`
-	GracePeriod         types.Int64  `tfsdk:"grace_period"`
-	ChildMonitorIDs     types.Set    `tfsdk:"child_monitor_ids"`
-	PushToken           types.String `tfsdk:"push_token"`
-	BasicAuthUser       types.String `tfsdk:"basic_auth_user"`
-	BasicAuthPassword   types.String `tfsdk:"basic_auth_password"`
-	Auth                types.Object `tfsdk:"auth"`
-	AlertChannelIDs     types.Set    `tfsdk:"alert_channel_ids"`
-	Status              types.String `tfsdk:"status"`
+	ID                  types.String  `tfsdk:"id"`
+	Name                types.String  `tfsdk:"name"`
+	URL                 types.String  `tfsdk:"url"`
+	Type                types.String  `tfsdk:"type"`
+	Interval            types.Int64   `tfsdk:"interval"`
+	Regions             types.List    `tfsdk:"regions"`
+	AcceptedStatusCodes types.List    `tfsdk:"accepted_status_codes"`
+	Tags                types.Set     `tfsdk:"tags"`
+	Paused              types.Bool    `tfsdk:"paused"`
+	Muted               types.Bool    `tfsdk:"muted"`
+	Keyword             types.String  `tfsdk:"keyword"`
+	FollowRedirects     types.Bool    `tfsdk:"follow_redirects"`
+	Port                types.Int64   `tfsdk:"port"`
+	DNSRecordType       types.String  `tfsdk:"dns_record_type"`
+	DNSExpectedValue    types.String  `tfsdk:"dns_expected_value"`
+	HTTPMethod          types.String  `tfsdk:"http_method"`
+	HTTPHeaders         types.Map     `tfsdk:"http_headers"`
+	HTTPBody            types.String  `tfsdk:"http_body"`
+	HTTPBodyEncoding    types.String  `tfsdk:"http_body_encoding"`
+	IgnoreTLS           types.Bool    `tfsdk:"ignore_tls"`
+	Retries             types.Int64   `tfsdk:"retries"`
+	Severity3xx         types.String  `tfsdk:"severity_3xx"`
+	LatencyThresholdMs  types.Int64   `tfsdk:"latency_threshold_ms"`
+	LatencyPublic       types.Bool    `tfsdk:"latency_public"`
+	LatencyAnomaly      types.Bool    `tfsdk:"latency_anomaly"`
+	SLOTarget           types.Float64 `tfsdk:"slo_target"`
+	KeywordInvert       types.Bool    `tfsdk:"keyword_invert"`
+	JSONPath            types.String  `tfsdk:"json_path"`
+	JSONOperator        types.String  `tfsdk:"json_operator"`
+	JSONExpectedValue   types.String  `tfsdk:"json_expected_value"`
+	DNSServer           types.String  `tfsdk:"dns_server"`
+	DBQuery             types.String  `tfsdk:"db_query"`
+	GracePeriod         types.Int64   `tfsdk:"grace_period"`
+	ChildMonitorIDs     types.Set     `tfsdk:"child_monitor_ids"`
+	PushToken           types.String  `tfsdk:"push_token"`
+	BasicAuthUser       types.String  `tfsdk:"basic_auth_user"`
+	BasicAuthPassword   types.String  `tfsdk:"basic_auth_password"`
+	Auth                types.Object  `tfsdk:"auth"`
+	AlertChannelIDs     types.Set     `tfsdk:"alert_channel_ids"`
+	Status              types.String  `tfsdk:"status"`
 }
 
 // Valid region codes and the accepted-status-code shape ("200" or "200-299")
@@ -420,6 +422,11 @@ func (r *MonitorResource) Schema(ctx context.Context, req resource.SchemaRequest
 				MarkdownDescription: "Alert when the response time moves well out of its learned usual range, region by region and by hour of the week (Max and Enterprise; 7 days of learning first). Refused at `apply` on a lower plan.",
 				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
+			"slo_target": schema.Float64Attribute{
+				Optional:            true,
+				MarkdownDescription: "Availability objective in percent over 30 rolling days (e.g. `99.9`), from which the error budget is derived: only downtime counts, planned maintenance excluded. Budget notices go to the monitor's alert channels. Max and Enterprise; refused at `apply` on a lower plan. Omit it for no SLO.",
+				Validators:          []validator.Float64{float64validator.Between(50, 99.999)},
+			},
 			"keyword_invert": schema.BoolAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -596,6 +603,7 @@ func (r *MonitorResource) Create(ctx context.Context, req resource.CreateRequest
 	in.LatencyThresholdMs = int64PtrOrNil(data.LatencyThresholdMs)
 	in.LatencyPublic = boolPtrOrNil(data.LatencyPublic)
 	in.LatencyAnomaly = boolPtrOrNil(data.LatencyAnomaly)
+	in.SLOTarget = float64PtrOrNil(data.SLOTarget)
 	in.KeywordInvert = boolPtrOrNil(data.KeywordInvert)
 	in.JSONPath = data.JSONPath.ValueString()
 	in.JSONOperator = data.JSONOperator.ValueString()
@@ -839,6 +847,13 @@ func monitorUpdateInput(ctx context.Context, data, prior monitorResourceModel) (
 	if known(data.LatencyAnomaly) && !data.LatencyAnomaly.Equal(prior.LatencyAnomaly) {
 		in.LatencyAnomaly = boolPtrOrNil(data.LatencyAnomaly)
 	}
+	if !data.SLOTarget.Equal(prior.SLOTarget) {
+		if data.SLOTarget.IsNull() {
+			in.Null = append(in.Null, "sloTarget")
+		} else {
+			in.SLOTarget = float64PtrOrNil(data.SLOTarget)
+		}
+	}
 	if !data.KeywordInvert.Equal(prior.KeywordInvert) {
 		in.KeywordInvert = boolPtrOrNil(data.KeywordInvert)
 	}
@@ -1000,6 +1015,11 @@ func writeMonitor(ctx context.Context, data *monitorResourceModel, m *client.Mon
 	}
 	data.LatencyPublic = types.BoolValue(m.LatencyPublic == nil || *m.LatencyPublic)
 	data.LatencyAnomaly = types.BoolValue(m.LatencyAnomaly != nil && *m.LatencyAnomaly)
+	if m.SLOTarget == nil {
+		data.SLOTarget = types.Float64Null()
+	} else {
+		data.SLOTarget = types.Float64Value(*m.SLOTarget)
+	}
 	data.KeywordInvert = types.BoolValue(m.KeywordInvert != nil && *m.KeywordInvert)
 	data.JSONPath = stringOrEmpty(m.JSONPath)
 	data.JSONOperator = stringOrEmpty(m.JSONOperator)

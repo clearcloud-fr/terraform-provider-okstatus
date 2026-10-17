@@ -21,15 +21,16 @@ type MonitorGroupsDataSource struct {
 }
 
 type monitorGroupListItemModel struct {
-	ID              types.String `tfsdk:"id"`
-	Name            types.String `tfsdk:"name"`
-	Description     types.String `tfsdk:"description"`
-	Color           types.String `tfsdk:"color"`
-	Tags            types.Set    `tfsdk:"tags"`
-	AlertChannelIDs types.Set    `tfsdk:"alert_channel_ids"`
-	MonitorIDs      types.Set    `tfsdk:"monitor_ids"`
-	Paused          types.Bool   `tfsdk:"paused"`
-	Muted           types.Bool   `tfsdk:"muted"`
+	ID              types.String  `tfsdk:"id"`
+	Name            types.String  `tfsdk:"name"`
+	Description     types.String  `tfsdk:"description"`
+	Color           types.String  `tfsdk:"color"`
+	Tags            types.Set     `tfsdk:"tags"`
+	AlertChannelIDs types.Set     `tfsdk:"alert_channel_ids"`
+	MonitorIDs      types.Set     `tfsdk:"monitor_ids"`
+	Paused          types.Bool    `tfsdk:"paused"`
+	Muted           types.Bool    `tfsdk:"muted"`
+	SLOTarget       types.Float64 `tfsdk:"slo_target"`
 }
 
 type monitorGroupsDataSourceModel struct {
@@ -73,6 +74,7 @@ func (d *MonitorGroupsDataSource) Schema(ctx context.Context, req datasource.Sch
 						"monitor_ids":       stringSetAttr("Ids of the group's monitors."),
 						"paused":            schema.BoolAttribute{Computed: true, MarkdownDescription: "The group was paused as a whole from the dashboard."},
 						"muted":             schema.BoolAttribute{Computed: true, MarkdownDescription: "The group was muted as a whole from the dashboard."},
+						"slo_target":        schema.Float64Attribute{Computed: true, MarkdownDescription: "SLO objective in percent over 30 rolling days, null when the group has none."},
 					},
 				},
 			},
@@ -103,6 +105,7 @@ func (d *MonitorGroupsDataSource) Read(ctx context.Context, req datasource.ReadR
 			MonitorIDs:      stringSet(ctx, g.MonitorIDs, &resp.Diagnostics),
 			Paused:          types.BoolValue(g.Paused),
 			Muted:           types.BoolValue(g.Muted),
+			SLOTarget:       types.Float64PointerValue(g.SLOTarget),
 		})
 	}
 	if resp.Diagnostics.HasError() {
