@@ -183,20 +183,24 @@ type monitorResourceModel struct {
 // mirror ok-status-backend's VALID_REGIONS (src/shared/constants.ts) and
 // statusCodePattern (src/api/schemas/monitors.ts) — api-v1 rejects anything
 // else with a 400 before this provider ever sees a response.
-// OKS-266 — widened from the original 8 codes to the backend's current
-// 24-region cc-city set (OKS-482 rename, 2026-08-29), plus "private"
-// (customer-deployed private agents, OKS-401). The old bare country codes
-// (fr, de, nl, …) stay accepted as dual-accept shims for one release.
+// OKS-266 — widened from the original 8 codes to the backend's cc-city set
+// (OKS-482 rename, 2026-08-29), plus "private" (customer-deployed private
+// agents, OKS-401). OKS-888 (2026-10-21) — 24 regions: 12 on Free/Pro/Max
+// (us-nyc and us-sjo added) and 12 Enterprise ones (jp-tyo added); us-hil,
+// au-mel and za-cpt became shims for us-nyc, au-syd and za-jnb.
 var validRegionCodes = []string{
-	"fr-dc3", "fr-sbg", "ie-dub", "dk-cph",
-	"de-fra", "nl-ams", "es-mad", "se-sto", "pl-waw", "ch-zrh", "uk-lon", "it-mil",
-	"ca-bhs", "us-hil", "br-sao", "cl-scl", "sg-sgp", "in-mum", "bh-man", "qa-doh",
-	"za-cpt", "za-jnb", "au-syd", "au-mel",
+	// Free, Pro, Max
+	"fr-dc3", "de-fra", "es-mad", "uk-lon", "nl-ams", "pl-waw",
+	"se-sto", "dk-cph", "us-nyc", "us-sjo", "sg-sgp", "au-syd",
+	// Enterprise
+	"fr-sbg", "ie-dub", "it-mil", "ch-zrh", "ca-bhs", "br-sao", "cl-scl",
+	"in-mum", "za-jnb", "bh-man", "qa-doh", "jp-tyo",
+	// deprecated 2026-10-21 (OKS-888): the backend stores us-nyc, au-syd, za-jnb
+	"us-hil", "au-mel", "za-cpt",
 	// deprecated dual-accept shims (renamed to cc-city on 2026-08-29)
 	"fr", "de", "nl", "es", "se", "pl", "ch", "uk", "it",
 	"ca", "us", "br", "cl", "sg", "in", "bh", "qa",
-	// deprecated 2026-10-04: Roubaix → ie-dub, Gravelines → dk-cph (the
-	// backend stores the replacement)
+	// deprecated 2026-10-04: Roubaix, Gravelines
 	"fr-rbx", "fr-gra",
 	"private",
 }
@@ -255,12 +259,13 @@ func (r *MonitorResource) Schema(ctx context.Context, req resource.SchemaRequest
 				Computed:    true,
 				ElementType: types.StringType,
 				MarkdownDescription: "Regions to check from — your main region plus secondary regions (max 5 per " +
-					"monitor). Any of the 24 public region codes (`fr-dc3`, `fr-sbg`, `ie-dub`, `dk-cph`, " +
-					"`de-fra`, `nl-ams`, `es-mad`, `se-sto`, `pl-waw`, `ch-zrh`, `uk-lon`, `it-mil`, `ca-bhs`, " +
-					"`us-hil`, `br-sao`, `cl-scl`, `sg-sgp`, `in-mum`, `za-cpt`, " +
-					"`za-jnb`, `au-syd`, `au-mel`, `bh-man`, `qa-doh`), `private` (any of your own deployed agents) " +
+					"monitor). Any of the 24 public region codes — Free, Pro and Max: `fr-dc3`, `de-fra`, " +
+					"`es-mad`, `uk-lon`, `nl-ams`, `pl-waw`, `se-sto`, `dk-cph`, `us-nyc`, `us-sjo`, `sg-sgp`, " +
+					"`au-syd`; Enterprise adds `fr-sbg`, `ie-dub`, `it-mil`, `ch-zrh`, `ca-bhs`, " +
+					"`br-sao`, `cl-scl`, `in-mum`, `za-jnb`, `bh-man`, `qa-doh`, `jp-tyo` — " +
+					"`private` (any of your own deployed agents) " +
 					"or `private:<agent id>` (one agent — the `region` attribute of `data.okstatus_private_agents`); " +
-					"the pre-rename bare country codes (`fr`, `de`, `nl`, …) are still accepted but deprecated. " +
+					"the pre-rename bare country codes (`fr`, `de`, `nl`, …) and `us-hil`, `au-mel`, `za-cpt` are still accepted but deprecated. " +
 					"Defaults to `[\"fr-dc3\"]`. Which of these your plan actually allows is enforced " +
 					"server-side (`PLAN_ALLOWED_REGIONS`) — a region your plan doesn't include fails at `apply` " +
 					"with a 400, not at `plan`.",
