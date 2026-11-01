@@ -549,3 +549,47 @@ func TestClientStopsWaitingWhenCancelled(t *testing.T) {
 		t.Fatalf("pas de nouvel appel après annulation, %d faits", *calls)
 	}
 }
+
+// OKS-902 — sections d'une page de statut.
+func TestGetStatusPageReadsSections(t *testing.T) {
+	rs := newServer(t, http.StatusOK, `{"statusPage":{"id":"sp-1","slug":"acme"},"sections":[{"name":"Web","monitorIds":["m2","m1"]}]}`)
+	sp, err := New(rs.srv.URL, "k").GetStatusPage(context.Background(), "sp-1")
+	if err != nil {
+		t.Fatalf("GetStatusPage: %v", err)
+	}
+	if sp.Sections == nil || len(*sp.Sections) != 1 || (*sp.Sections)[0].MonitorIDs[0] != "m2" {
+		t.Fatalf("sections mal décodées: %+v", sp.Sections)
+	}
+}
+
+func TestGetStatusPageWithoutSectionsLeavesThemNil(t *testing.T) {
+	rs := newServer(t, http.StatusOK, `{"statusPage":{"id":"sp-1","slug":"acme"},"groups":[]}`)
+	sp, err := New(rs.srv.URL, "k").GetStatusPage(context.Background(), "sp-1")
+	if err != nil {
+		t.Fatalf("GetStatusPage: %v", err)
+	}
+	if sp.Sections != nil {
+		t.Fatalf("une API sans sections doit donner nil, pas une page vide: %+v", *sp.Sections)
+	}
+}
+
+func TestSetStatusPageSectionsSendsCompleteList(t *testing.T) {
+	rs := newServer(t, http.StatusOK, `{"sections":[]}`)
+	if _, err := New(rs.srv.URL, "k").SetStatusPageSections(context.Background(), "sp-1", []StatusPageSection{{Name: "Empty"}}); err != nil {
+		t.Fatalf("SetStatusPageSections: %v", err)
+	}
+	if rs.gotMethod != http.MethodPut || rs.gotPath != "/status-pages/sp-1/sections" {
+		t.Fatalf("méthode/chemin: %s %s", rs.gotMethod, rs.gotPath)
+	}
+	// monitorIds vide envoyé en [] et non null : l'API le refuserait.
+	if got := string(rs.gotBody); got != `{"sections":[{"name":"Empty","monitorIds":[]}]}` {
+		t.Fatalf("corps: %s", got)
+	}
+
+	if _, err := New(rs.srv.URL, "k").SetStatusPageSections(context.Background(), "sp-1", nil); err != nil {
+		t.Fatalf("SetStatusPageSections(nil): %v", err)
+	}
+	if got := string(rs.gotBody); got != `{"sections":[]}` {
+		t.Fatalf("une liste vide doit vider la page: %s", got)
+	}
+}

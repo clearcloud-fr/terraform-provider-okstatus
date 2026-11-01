@@ -20,6 +20,14 @@ resource "okstatus_status_page" "public" {
   theme        = "auto"
   accent_color = "#00e599"
   published    = true
+
+  # Monitors shown on the page, by section, in display order.
+  # Leave `sections` out to arrange them in the dashboard instead;
+  # `sections = []` empties the page.
+  sections = [
+    { name = "Website", monitor_ids = [okstatus_monitor.website.id] },
+    { name = "API", monitor_ids = [okstatus_monitor.api.id, okstatus_monitor.db.id] },
+  ]
 }
 ```
 
@@ -42,8 +50,17 @@ resource "okstatus_status_page" "public" {
 - `footer_text` (String)
 - `logo_url` (String)
 - `published` (Boolean) Whether the page is publicly visible. Defaults to `true`.
+- `sections` (Attributes List) The monitors the page shows, grouped in named sections, in display order. This is the complete list: it replaces the sections set in the dashboard, and `[]` empties the page. Leave it out to manage the sections in the dashboard only; Terraform then never touches them. A monitor can appear in one section only. (see [below for nested schema](#nestedatt--sections))
 - `theme` (String)
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+
+<a id="nestedatt--sections"></a>
+### Nested Schema for `sections`
+
+Required:
+
+- `monitor_ids` (List of String) IDs of the monitors in this section, in display order.
+- `name` (String) Section title shown on the page (1-100 characters).

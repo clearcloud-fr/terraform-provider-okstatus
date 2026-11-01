@@ -658,6 +658,17 @@ type StatusPage struct {
 	Published           bool    `json:"published"`
 	AutoRefreshInterval int64   `json:"autoRefreshInterval"`
 	CustomDomain        *string `json:"customDomain"`
+
+	// Sections is filled by GetStatusPage only. nil means the API did not
+	// return them (an API older than OKS-902), not an empty page.
+	Sections *[]StatusPageSection `json:"-"`
+}
+
+// StatusPageSection is one named group of monitors on a status page, in
+// display order.
+type StatusPageSection struct {
+	Name       string   `json:"name"`
+	MonitorIDs []string `json:"monitorIds"`
 }
 
 type StatusPageCreateInput struct {
@@ -697,12 +708,37 @@ func (c *Client) CreateStatusPage(ctx context.Context, in StatusPageCreateInput)
 
 func (c *Client) GetStatusPage(ctx context.Context, id string) (*StatusPage, error) {
 	var env struct {
-		StatusPage StatusPage `json:"statusPage"`
+		StatusPage StatusPage           `json:"statusPage"`
+		Sections   *[]StatusPageSection `json:"sections"`
 	}
 	if err := c.do(ctx, http.MethodGet, "/status-pages/"+id, nil, &env); err != nil {
 		return nil, err
 	}
+	env.StatusPage.Sections = env.Sections
 	return &env.StatusPage, nil
+}
+
+// SetStatusPageSections replaces every section of the page (an empty list
+// empties it) and returns them as stored.
+func (c *Client) SetStatusPageSections(ctx context.Context, id string, sections []StatusPageSection) ([]StatusPageSection, error) {
+	if sections == nil {
+		sections = []StatusPageSection{}
+	}
+	for i := range sections {
+		if sections[i].MonitorIDs == nil {
+			sections[i].MonitorIDs = []string{}
+		}
+	}
+	in := struct {
+		Sections []StatusPageSection `json:"sections"`
+	}{sections}
+	var out struct {
+		Sections []StatusPageSection `json:"sections"`
+	}
+	if err := c.do(ctx, http.MethodPut, "/status-pages/"+id+"/sections", in, &out); err != nil {
+		return nil, err
+	}
+	return out.Sections, nil
 }
 
 func (c *Client) UpdateStatusPage(ctx context.Context, id string, in StatusPageUpdateInput) (*StatusPage, error) {
