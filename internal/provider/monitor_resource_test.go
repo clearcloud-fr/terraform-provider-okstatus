@@ -9,6 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/Clearcloud-Fr/terraform-provider-okstatus/internal/client"
 )
 
 func tagSet(values ...string) types.Set {
@@ -351,5 +353,43 @@ func TestURLWithCredentialsIsRefused(t *testing.T) {
 		if got := !resp.Diagnostics.HasError(); got != want {
 			t.Errorf("url %q: acceptée=%v, attendu %v", value, got, want)
 		}
+	}
+}
+
+// 2026-11-01 — OKStatus leaves a heartbeat's token out of what a read-only
+// key reads (a CI `terraform plan`). The refresh must keep the token already
+// in the state: blanking it would empty every output built on it.
+func TestRefreshKeepsPushTokenTheAPIDoesNotReturn(t *testing.T) {
+	data := storedMonitor()
+	data.Type = types.StringValue("push")
+	data.PushToken = types.StringValue("tok-in-state")
+
+	m := &client.Monitor{ID: "mon-1", Name: "Backup", URL: "nightly", Type: "push", Interval: 86400}
+	if diags := writeMonitor(context.Background(), &data, m); diags.HasError() {
+		t.Fatalf("writeMonitor: %v", diags)
+	}
+	if got := data.PushToken.ValueString(); got != "tok-in-state" {
+		t.Fatalf("push_token = %q, want the token kept from the state", got)
+	}
+
+	fresh := "tok-from-api"
+	m.PushToken = &fresh
+	if diags := writeMonitor(context.Background(), &data, m); diags.HasError() {
+		t.Fatalf("writeMonitor: %v", diags)
+	}
+	if got := data.PushToken.ValueString(); got != "tok-from-api" {
+		t.Fatalf("push_token = %q, want the token the API returned", got)
+	}
+}
+
+func TestRefreshBlanksPushTokenOfANonPushMonitor(t *testing.T) {
+	data := storedMonitor()
+	data.PushToken = types.StringValue("stale")
+	m := &client.Monitor{ID: "mon-1", Name: "API", URL: "https://api.example.com", Type: "http", Interval: 60}
+	if diags := writeMonitor(context.Background(), &data, m); diags.HasError() {
+		t.Fatalf("writeMonitor: %v", diags)
+	}
+	if got := data.PushToken.ValueString(); got != "" {
+		t.Fatalf("push_token = %q, want empty for an http monitor", got)
 	}
 }

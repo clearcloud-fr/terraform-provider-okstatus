@@ -35,7 +35,7 @@ resource "okstatus_alert_channel" "team_discord" {
 
 ### Required
 
-- `config` (Map of String) Channel configuration, string key/value pairs (e.g. `webhookUrl`, `email`) — see the resource description above for the exact keys per `type`. Changing it replaces the resource — api-v1 has no PATCH for config, only for `enabled`.
+- `config` (Map of String, Sensitive) Channel configuration, string key/value pairs (e.g. `webhookUrl`, `email`) — see the resource description above for the exact keys per `type`. Sensitive: it holds webhook URLs and tokens. OKStatus returns those masked, so the state keeps what the configuration says and an edit made in the dashboard is not detected. Changing it replaces the resource — api-v1 has no PATCH for config, only for `enabled`.
 - `type` (String)
 
 ### Optional

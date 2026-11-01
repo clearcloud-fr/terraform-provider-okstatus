@@ -497,8 +497,9 @@ func (r *MonitorResource) Schema(ctx context.Context, req resource.SchemaRequest
 			"push_token": schema.StringAttribute{
 				Computed:  true,
 				Sensitive: true,
-				MarkdownDescription: "`push` only: the token of the monitor's ping URL (`/push/<token>` on the address shown on " +
-					"the monitor's page). Anyone holding it can report the job as alive.",
+				MarkdownDescription: "`push` only: the token of the monitor's ping URL, `https://backend.okstatus.eu/push/<token>`, which the job " +
+					"calls with `POST`. Returned to a Full API key only: a refresh with a read-only key keeps the value " +
+					"already in the state. Anyone holding it can report the job as alive.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"basic_auth_user": schema.StringAttribute{
@@ -1041,7 +1042,16 @@ func writeMonitor(ctx context.Context, data *monitorResourceModel, m *client.Mon
 	data.ChildMonitorIDs = children
 	// "" for a monitor that is not a push monitor: a known value keeps the
 	// attribute out of every later plan.
-	data.PushToken = stringOrEmpty(m.PushToken)
+	// 2026-11-01 — OKStatus no longer returns a heartbeat's token to a
+	// read-only key (a CI `terraform plan`): keep the one already in the
+	// state instead of blanking it, or outputs built on it would turn empty.
+	if m.PushToken != nil {
+		data.PushToken = types.StringValue(*m.PushToken)
+	} else if m.Type == "push" && !data.PushToken.IsNull() && !data.PushToken.IsUnknown() && data.PushToken.ValueString() != "" {
+		// keep data.PushToken as it is
+	} else {
+		data.PushToken = types.StringValue("")
+	}
 	// basic_auth_*, auth and http_headers are not touched: OKStatus returns
 	// them masked, the state keeps what the configuration says.
 	if m.Port == nil {

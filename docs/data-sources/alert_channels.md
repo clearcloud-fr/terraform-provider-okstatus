@@ -40,4 +40,5 @@ Read-Only:
 
 - `enabled` (Boolean)
 - `id` (String)
+- `name` (String) The channel's name in the dashboard — the way to tell two channels of the same type apart.
 - `type` (String)

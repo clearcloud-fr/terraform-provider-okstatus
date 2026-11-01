@@ -58,8 +58,9 @@ resource "okstatus_monitor" "backup" {
   grace_period = 3600
 }
 
-output "backup_push_token" {
-  value     = okstatus_monitor.backup.push_token
+# The URL the backup job calls with POST on each run.
+output "backup_ping_url" {
+  value     = "https://backend.okstatus.eu/push/${okstatus_monitor.backup.push_token}"
   sensitive = true
 }
 

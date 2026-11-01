@@ -73,8 +73,9 @@ resource "okstatus_monitor" "backup" {
   grace_period = 3600
 }
 
-output "backup_push_token" {
-  value     = okstatus_monitor.backup.push_token
+# The URL the backup job calls with POST on each run.
+output "backup_ping_url" {
+  value     = "https://backend.okstatus.eu/push/${okstatus_monitor.backup.push_token}"
   sensitive = true
 }
 
@@ -141,15 +142,15 @@ resource "okstatus_monitor" "database" {
 - `port` (Number) `tcp` only: port to connect to.
 - `regions` (List of String) Regions to check from — your main region plus secondary regions (max 5 per monitor). Any of the 24 public region codes — Free, Pro and Max: `fr-dc3`, `de-fra`, `es-mad`, `uk-lon`, `nl-ams`, `pl-waw`, `se-sto`, `dk-cph`, `us-nyc`, `us-sjo`, `sg-sgp`, `au-syd`; Enterprise adds `fr-sbg`, `ie-dub`, `it-mil`, `ch-zrh`, `ca-bhs`, `br-sao`, `cl-scl`, `in-mum`, `za-jnb`, `bh-man`, `qa-doh`, `jp-tyo` — `private` (any of your own deployed agents) or `private:<agent id>` (one agent — the `region` attribute of `data.okstatus_private_agents`); the pre-rename bare country codes (`fr`, `de`, `nl`, …) and `us-hil`, `au-mel`, `za-cpt` are still accepted but deprecated. Defaults to `["fr-dc3"]`. Which of these your plan actually allows is enforced server-side (`PLAN_ALLOWED_REGIONS`) — a region your plan doesn't include fails at `apply` with a 400, not at `plan`.
 - `retries` (Number) Consecutive failed checks tolerated before the monitor is down (0–5; a new monitor uses 1).
-- `slo_target` (Number) Availability objective in percent over 30 rolling days (e.g. `99.9`), from which the error budget is derived: only downtime counts, planned maintenance excluded. Budget notices go to the monitor's alert channels. Max and Enterprise; refused at `apply` on a lower plan. Omit it for no SLO.
 - `severity_3xx` (String) `http` only: a redirect response that is not accepted counts as `degraded` (what a new monitor uses) or `down`.
+- `slo_target` (Number) Availability objective in percent over 30 rolling days (e.g. `99.9`), from which the error budget is derived: only downtime counts, planned maintenance excluded. Budget notices go to the monitor's alert channels. Max and Enterprise; refused at `apply` on a lower plan. Omit it for no SLO.
 - `tags` (Set of String) Tags (5 at most, 30 characters each). Left out, the monitor's current tags are kept; `[]` removes them all. If your organization lowercases tags (Settings → Tags), write them in lowercase here, or `apply` reports an inconsistent result.
 - `type` (String) Check type: `http`, `tcp`, `ping`, `dns`, `grpc`, `push`, `group`, `postgres`, `mysql`, `mongodb`, `smtp`, `imap` or `redis`. Defaults to `http`. Which types your plan includes is enforced at `apply`. Changing it replaces the monitor: a type cannot be changed afterwards.
 
 ### Read-Only
 
 - `id` (String) Monitor ID.
-- `push_token` (String, Sensitive) `push` only: the token of the monitor's ping URL (`/push/<token>` on the address shown on the monitor's page). Anyone holding it can report the job as alive.
+- `push_token` (String, Sensitive) `push` only: the token of the monitor's ping URL, `https://backend.okstatus.eu/push/<token>`, which the job calls with `POST`. Returned to a Full API key only: a refresh with a read-only key keeps the value already in the state. Anyone holding it can report the job as alive.
 - `status` (String) Current monitor status as last reported by OKStatus (`pending`, `active`, `paused`, `down`).
 
 <a id="nestedatt--auth"></a>
